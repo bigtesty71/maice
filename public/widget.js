@@ -122,7 +122,7 @@
 
     const persona = document.createElement('div');
     persona.id = 'maice-widget-persona';
-    persona.innerHTML = `<img src="${WIDGET_URL}/images/Macie2.png" alt="Macy">`;
+    persona.innerHTML = `<img src="${WIDGET_URL}/images/Macie2.png" alt="Macy" style="object-position: top center;">`;
 
     const frame = document.createElement('iframe');
     frame.id = 'maice-widget-frame';

@@ -24,6 +24,11 @@
       <span class="icon">⚡</span> MAIce
     </div>
 
+    <!-- Sidebar Persona Image - Best with 150x500 aspect -->
+    <div class="sidebar-persona">
+      <img id="sidebar-img" src="images/Macie2.png" alt="Macy">
+    </div>
+
     <div class="sidebar-body">
       <!-- Neural Metrics -->
       <div class="widget">
@@ -443,7 +448,7 @@
           }
 
           console.log('[Puter TTS] Synthesizing high-quality voice (Joanna/Neural)...');
-          // Use 'neural' engine and 'Joanna' voice (Change name below to switch voices)
+          // 💡 USER: Change 'Joanna' to 'Matthew', 'Salli', or 'Joey' to switch voices
           currentAudio = await puter.ai.txt2speech(clean, {
             voice: 'Joanna',
             engine: 'neural'
