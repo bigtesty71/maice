@@ -52,13 +52,12 @@ class MemoryKeepEngine {
     this.streamFile = this.isVercel ? '/tmp/stream_state.json' : path.join(process.cwd(), 'stream_state.json');
     this.stream = this._loadStream();
 
-    // --- Timing ---
+    // --- Timing & Rate Limiting ---
     this.lastInteraction = Date.now();
     this.lastLLMCall = 0;
     this.llmQueue = Promise.resolve(); // Queue for serializing LLM calls
-
-    // --- Browser instance (lazy-loaded) ---
-    this.browser = null;
+    this.llmBusy = false; // Global lock to prevent overlapping background/foreground calls
+    this.lastPrompts = new Map(); // Store hash/content of recent prompts to prevent redundancy
 
     // --- Heartbeat (autonomous background loop) ---
     this.heartbeatInterval = null;
@@ -196,14 +195,29 @@ class MemoryKeepEngine {
   async callLLM(messages, purpose = 'inference') {
     // Chain onto the queue to ensure serialization
     const task = async () => {
-      // --- Rate Limiting (1 req/sec max) ---
+      // --- Rate Limiting (Increased throttle to 2s) ---
       const now = Date.now();
       const timeSinceLast = now - (this.lastLLMCall || 0);
-      if (timeSinceLast < 1200) {
-        const wait = 1200 - timeSinceLast;
-        // console.log(`[Rate Limit] Throttling ${purpose} for ${wait}ms...`);
+      if (timeSinceLast < 2000) {
+        const wait = 2000 - timeSinceLast;
+        console.log(`[Rate Limit] Throttling ${purpose} for ${wait}ms...`);
         await new Promise(r => setTimeout(r, wait));
       }
+
+      // --- Redundancy Check ---
+      const promptKey = JSON.stringify(messages).slice(-500); // Simple key from last 500 chars
+      if (this.lastPrompts.has(promptKey) && (now - this.lastPrompts.get(promptKey)) < 5000) {
+        console.warn(`[Redundancy] Blocking redundant ${purpose} call.`);
+        return '';
+      }
+      this.lastPrompts.set(promptKey, Date.now());
+      // Clean up old prompts
+      if (this.lastPrompts.size > 20) {
+        const firstKey = this.lastPrompts.keys().next().value;
+        this.lastPrompts.delete(firstKey);
+      }
+
+      this.llmBusy = true;
       this.lastLLMCall = Date.now();
 
       const purposeGroup = purpose.toLowerCase();
@@ -235,6 +249,8 @@ class MemoryKeepEngine {
       } catch (err) {
         console.error(`[LLM Error] ${purpose}: ${err.message}`);
         return `Error connecting to Mistral: ${err.message}`;
+      } finally {
+        this.llmBusy = false;
       }
     };
 
@@ -252,6 +268,11 @@ class MemoryKeepEngine {
   // =========================================================================
 
   async intakeValve(msg) {
+    if (!msg || msg.length < 5) return; // Skip very short messages
+    if (this.llmBusy) {
+      console.log('[Intake Valve] Postponed: LLM busy with inference.');
+      return;
+    }
     // --- Unified Intelligent Intake (Classification + Extraction) ---
     const prompt = [
       {
@@ -921,11 +942,11 @@ IMPORTANT:
     // --- LLM Call ---
     let reply = await this.callLLM(messages, 'inference');
 
-    // --- Multi-Tool Agent Loop (up to 3 rounds) ---
+    // --- Multi-Tool Agent Loop (Optimized rounds: 2) ---
     const TOOL_NAMES = ['SEARCH', 'REMEMBER', 'TASK_ADD', 'TASK_LIST', 'TASK_DONE', 'ANALYZE', 'FETCH', 'READ', 'WRITE', 'LIST_FILES', 'TIME', 'EMAIL', 'BROWSE', 'TELEGRAM'];
     let toolRound = 0;
 
-    while (toolRound < 3) {
+    while (toolRound < 2) {
       const toolCalls = [];
       const lines = reply.split('\n');
 
@@ -1204,6 +1225,10 @@ IMPORTANT:
     console.log(`[Heartbeat] Starting autonomous loop (every ${this.heartbeatMinutes}min)`);
 
     this.heartbeatInterval = setInterval(async () => {
+      if (this.llmBusy || (Date.now() - this.lastInteraction < 120000)) {
+        console.log('[Heartbeat] Skipping cycle: System active or LLM busy.');
+        return;
+      }
       console.log('\n--- [MAIce Heartbeat] Autonomous cycle starting ---');
       try {
         const graphData = this.getGraphSummary();
