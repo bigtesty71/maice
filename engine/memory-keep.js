@@ -32,7 +32,16 @@ class MemoryKeepEngine {
     this.sidecarClient = new Mistral({ apiKey: process.env.MISTRAL_API_KEY_SIDECAR || process.env.MISTRAL_API_KEY });
 
     // --- Database ---
-    this.dbPath = dbPath || path.join(process.cwd(), 'memory_keep.db');
+    this.isVercel = process.env.VERCEL === '1';
+    if (this.isVercel) {
+      console.log('[MAIce] Vercel environment detected. Using /tmp for database.');
+      this.dbPath = '/tmp/memory_keep.db';
+      // If it doesn't exist in /tmp, we might want to copy an initial one if it exists in process.cwd()
+      // But for serverless, it usually starts fresh or we rely on external DB.
+      // better-sqlite3 will create it if it doesn't exist.
+    } else {
+      this.dbPath = dbPath || path.join(process.cwd(), 'memory_keep.db');
+    }
     this.setupStorage();
 
     // --- Flat Files (always-loaded) ---
@@ -40,7 +49,7 @@ class MemoryKeepEngine {
     this.directives = this._loadFlat(path.join(engineDir, 'directives.txt'));
 
     // --- Stream (conscious thought) ---
-    this.streamFile = path.join(process.cwd(), 'stream_state.json');
+    this.streamFile = this.isVercel ? '/tmp/stream_state.json' : path.join(process.cwd(), 'stream_state.json');
     this.stream = this._loadStream();
 
     // --- Timing ---
@@ -54,13 +63,19 @@ class MemoryKeepEngine {
     // --- Heartbeat (autonomous background loop) ---
     this.heartbeatInterval = null;
     this.heartbeatMinutes = this.config.heartbeat_minutes || 30;
-    this.heartbeatInterval = null;
-    this.heartbeatMinutes = this.config.heartbeat_minutes || 30;
-    this.startHeartbeat();
+    if (!this.isVercel) {
+      this.startHeartbeat();
+    } else {
+      console.log('[MAIce] Heartbeat disabled in Vercel environment.');
+    }
 
     // --- Telegram Bot (2-way chat) ---
     this.telegramBot = null;
-    this.setupTelegramBot();
+    if (!this.isVercel) {
+      this.setupTelegramBot();
+    } else {
+      console.log('[MAIce] Telegram Bot disabled in Vercel environment.');
+    }
 
     console.log('[MAIce] Engine initialized.');
     console.log(`  Model: ${this.config.model_name}`);
@@ -547,6 +562,9 @@ If NO, just respond: {"important": "NO"}`
 
   /** BROWSE — Full browser interaction: navigate, extract, click, screenshot */
   async toolBrowse(args) {
+    if (this.isVercel) {
+      return 'BROWSE tool is disabled in the Vercel environment (Puppeteer not supported).';
+    }
     console.log(`[Tool:BROWSE] ${args.slice(0, 80)}`);
     try {
       const browser = await this._getBrowser();
