@@ -277,18 +277,14 @@ class MemoryKeepEngine {
     const prompt = [
       {
         role: 'system',
-        content: `You are the MAIce Intake Valve. Analyze the following user message. 
-If it contains important facts, preferences, or knowledge to remember long-term, respond with YES and a JSON extraction.
-If it is just casual chatter or unimportant, respond with NO.
+        content: `You are the MAIce Intake Valve (Neurographical Mode). Analyze the message for long-term significance.
+In addition to explicit facts, identify IMPLIED relationships (e.g. if the user says 'Stress makes my sleep bad', extract sleep -> influenced_by -> stress).
 
-Response format (strictly JSON if YES):
-{"important": "YES", "entities": [...], "relationships": [...]}
+Response format (strictly JSON):
+{"important": "YES"|"NO", "entities": [{"label": "...", "type": "..."}], "relationships": [{"source": "...", "target": "...", "relationship": "..."}]}
 
-Entity/Relationship format:
-{"label": "name", "type": "person|concept|place|thing|skill|project"}
-{"source": "entity1", "target": "entity2", "relationship": "verb/connection"}
-
-If NO, just respond: {"important": "NO"}`
+Types: person|concept|place|thing|skill|project.
+Focus on building a knowledge graph of the user's life and technical knowledge.`
       },
       { role: 'user', content: msg }
     ];
@@ -746,44 +742,46 @@ If NO, just respond: {"important": "NO"}`
    */
   getRelatedMemories(query, limit = 8) {
     const db = this._getDb();
+    // Improved term extraction (ignoring common stop words could be here, but let's keep it simple for now)
     const words = query.toLowerCase().split(/\s+/).filter(w => w.length > 2);
 
     if (words.length === 0) { db.close(); return []; }
 
-    // Find nodes matching any word in the query
+    // Find nodes matching any word in the query, prioritizing high strength
     const placeholders = words.map(() => 'label LIKE ?').join(' OR ');
     const params = words.map(w => `%${w}%`);
 
     const matchingNodes = db.prepare(
-      `SELECT label, type, strength FROM graph_nodes WHERE ${placeholders} ORDER BY strength DESC LIMIT 10`
+      `SELECT label, type, strength FROM graph_nodes WHERE ${placeholders} AND strength > 1.0 ORDER BY strength DESC LIMIT 15`
     ).all(...params);
 
     if (matchingNodes.length === 0) { db.close(); return []; }
 
-    // Walk edges from matching nodes
+    // Walk edges from matching nodes, prioritizing heavy weights
     const nodeLabels = matchingNodes.map(n => n.label);
     const edgePlaceholders = nodeLabels.map(() => '?').join(',');
 
     const edges = db.prepare(`
       SELECT source_label, target_label, relationship, weight
       FROM graph_edges
-      WHERE source_label IN (${edgePlaceholders}) OR target_label IN (${edgePlaceholders})
+      WHERE (source_label IN (${edgePlaceholders}) OR target_label IN (${edgePlaceholders}))
+      AND weight > 0.5
       ORDER BY weight DESC
       LIMIT ?
     `).all(...nodeLabels, ...nodeLabels, limit);
 
     db.close();
 
-    // Format as readable context
+    // Format as readable context, filtering out weak associations
     const facts = edges.map(e =>
-      `${e.source_label} —[${e.relationship}]→ ${e.target_label} (strength: ${e.weight})`
+      `${e.source_label} —[${e.relationship}]→ ${e.target_label}`
     );
 
     return {
       nodes: matchingNodes,
       edges,
       summary: facts.length > 0
-        ? `Graph recall: ${facts.join('; ')}`
+        ? `Graph recall (Active Nodes: ${nodeLabels.join(', ')}): ${facts.join('; ')}`
         : ''
     };
   }
@@ -848,10 +846,23 @@ If NO, just respond: {"important": "NO"}`
       if (jsonStart !== -1 && jsonEnd > jsonStart) {
         const analysis = JSON.parse(analysisRaw.slice(jsonStart, jsonEnd));
 
-        // Step 3 — Persist patterns
+        // Step 3 — Persist patterns & Synaptic Pruning
+        const db = this._getDb();
         for (const pattern of (analysis.patterns || [])) {
           this.saveExperience(`[Sifter Pattern] ${pattern}`);
         }
+
+        // --- Synaptic Pruning (Lightweight Decay) ---
+        // Decay strength of all nodes and weights of all edges
+        db.prepare('UPDATE graph_nodes SET strength = strength * 0.95').run();
+        db.prepare('UPDATE graph_edges SET weight = weight * 0.95').run();
+
+        // Remove "forgotten" nodes and edges
+        db.prepare('DELETE FROM graph_nodes WHERE strength < 0.1').run();
+        db.prepare('DELETE FROM graph_edges WHERE weight < 0.1').run();
+
+        db.close();
+        console.log('[MAIce] Synaptic pruning complete (Graph weight decay applied).');
 
         // Step 4 — Flush + Resume
         const overlapN = parseInt(this.config.rolling_overlap || 3);

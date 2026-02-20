@@ -24,6 +24,11 @@
       <span class="icon">⚡</span> MAIce
     </div>
 
+    <!-- Sidebar Persona Image -->
+    <div class="sidebar-persona">
+      <img id="sidebar-img" src="images/MAICE.png" alt="Macy">
+    </div>
+
     <div class="sidebar-body">
       <!-- Neural Metrics -->
       <div class="widget">
@@ -105,6 +110,9 @@
     <div class="header">
       <div class="header-label">
         PROTOCOL: <span class="active">NEURAL-KEEP (AGENTIC)</span> · MAIce ENGINE
+        <span id="puter-badge"
+          style="display:none; margin-left:10px; color:var(--neon-cyan); font-size:0.6rem; border:1px solid var(--neon-cyan); padding:2px 5px; border-radius:4px; vertical-align:middle;">PUTER
+          ACTIVE</span>
       </div>
       <div class="header-actions">
         <button id="tts-toggle" onclick="toggleTTS()" class="action-btn" title="Toggle Voice">🔈 ON</button>
@@ -433,21 +441,38 @@
       clean = clean.replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1");
       clean = clean.replace(/[\*\_]{1,3}([^\*\_]+)[\*\_]{1,3}/g, "$1");
 
-      try {
-        // Stop any currently playing audio
-        if (currentAudio) {
-          currentAudio.pause();
-        }
+      if (window.puter && window.puter.ai) {
+        try {
+          if (currentAudio) {
+            currentAudio.pause();
+          }
 
-        console.log('[Puter TTS] Synthesizing...');
-        // We use Puter's advanced txt2speech which returns an Audio object
-        currentAudio = await puter.ai.txt2speech(clean);
-        currentAudio.play();
-      } catch (err) {
-        console.error('[Puter TTS Error]', err);
-        // Fallback to native if Puter fails
+          console.log('[Puter TTS] Synthesizing high-quality voice (Joanna/Neural)...');
+          // Use 'neural' engine and 'Joanna' voice (Change name below to switch voices)
+          currentAudio = await puter.ai.txt2speech(clean, {
+            voice: 'Joanna',
+            engine: 'neural'
+          });
+          currentAudio.play();
+          return;
+        } catch (err) {
+          console.error('[Puter TTS Error]', err);
+        }
+      }
+
+      // Fallback to native SpeechSynthesis
+      try {
+        const synth = window.speechSynthesis;
+        synth.cancel();
         const utterance = new SpeechSynthesisUtterance(clean);
-        window.speechSynthesis.speak(utterance);
+        const voices = synth.getVoices();
+        const preferred = voices.find(v => v.name.includes('Female') || v.name.includes('Zira') || v.name.includes('Google US English'));
+        if (preferred) utterance.voice = preferred;
+        utterance.rate = 1.0;
+        utterance.pitch = 1.1;
+        synth.speak(utterance);
+      } catch (nativeErr) {
+        console.error('[Native TTS Error]', nativeErr);
       }
     }
 
@@ -460,7 +485,8 @@
     // SPEECH-TO-TEXT
     // ═══════════════════════════
     let recognition = null;
-    let isRecording = false;
+    let isUserWantsToListen = false;
+    let isBrowserListening = false;
 
     function initSpeech() {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -476,6 +502,13 @@
       recognition.interimResults = true;
       recognition.lang = 'en-US';
 
+      recognition.onstart = () => {
+        isBrowserListening = true;
+        document.getElementById('mic-btn').classList.add('recording');
+        document.getElementById('footer-status').textContent = 'Listening...';
+        console.log('[STT] Browser recording started.');
+      };
+
       recognition.onresult = (event) => {
         let fullTranscript = '';
         for (let i = 0; i < event.results.length; ++i) {
@@ -488,23 +521,27 @@
         console.error('[STT Error]', event.error);
         if (event.error === 'not-allowed') {
           alert('Microphone access denied. Please enable microphone permissions in your browser settings.');
-        } else if (event.error === 'network') {
-          alert('Network error during speech recognition. Please check your connection.');
-        } else if (event.error !== 'no-speech') {
-          console.warn('[STT] Recognition error:', event.error);
+          isUserWantsToListen = false;
         }
-        stopRecording();
       };
 
       recognition.onend = () => {
-        if (isRecording) {
-          // Unexpected stop, try to restart if it wasn't a manual stop
-          console.log('[STT] Recognition ended unexpectedly, attempting restart...');
+        isBrowserListening = false;
+        document.getElementById('mic-btn').classList.remove('recording');
+        console.log('[STT] Browser recording ended.');
+
+        // Auto-restart if user still wants to listen
+        if (isUserWantsToListen) {
+          console.log('[STT] Attempting auto-restart...');
           try {
             recognition.start();
           } catch (e) {
-            stopRecording();
+            console.error('[STT] Auto-restart failed', e);
+            isUserWantsToListen = false;
+            document.getElementById('footer-status').textContent = 'Ready';
           }
+        } else {
+          document.getElementById('footer-status').textContent = 'Ready';
         }
       };
     }
@@ -515,53 +552,67 @@
         if (!recognition) return;
       }
 
-      const input = document.getElementById('user-input');
-      const micBtn = document.getElementById('mic-btn');
-      const footerStatus = document.getElementById('footer-status');
+      isUserWantsToListen = !isUserWantsToListen;
 
-      if (isRecording) {
-        isRecording = false; // Set state first
-        try {
-          recognition.stop();
-        } catch (e) {
-          console.warn('[STT] Stop failed:', e);
-        }
-        stopRecording();
-      } else {
-        try {
-          // Double check to avoid InvalidStateError if it was somehow already running
-          try { recognition.abort(); } catch (e) { }
-
-          input.value = '';
-          recognition.start();
-          isRecording = true;
-          micBtn.classList.add('recording');
-          footerStatus.textContent = 'Listening... (Click mic to stop)';
-          console.log('[STT] Recording started.');
-        } catch (err) {
-          console.error('[STT Start Error]', err);
-          // If it's already started, just sync our local state
-          if (err.name === 'InvalidStateError') {
-            isRecording = true;
-            micBtn.classList.add('recording');
-            footerStatus.textContent = 'Listening... (Click mic to stop)';
-          } else {
-            alert('Microphone error: ' + err.message);
-            stopRecording();
+      if (isUserWantsToListen) {
+        if (!isBrowserListening) {
+          try {
+            recognition.start();
+          } catch (e) {
+            console.error('[STT] Start failed', e);
+            isUserWantsToListen = false;
           }
+        }
+      } else {
+        if (isBrowserListening) {
+          recognition.stop();
         }
       }
     }
 
     function stopRecording() {
-      isRecording = false;
-      const micBtn = document.getElementById('mic-btn');
-      const footerStatus = document.getElementById('footer-status');
-      if (micBtn) micBtn.classList.remove('recording');
-      if (footerStatus && footerStatus.textContent.includes('Listening')) {
-        footerStatus.textContent = 'Ready';
+      isUserWantsToListen = false;
+      if (recognition && isBrowserListening) {
+        recognition.stop();
       }
-      console.log('[STT] Recording stopped.');
+    }
+
+    // ═══════════════════════════
+    // PUTER INITIALIZATION
+    // ═══════════════════════════
+    async function initPuter() {
+      let attempts = 0;
+      const checkPuter = async () => {
+        if (window.puter) {
+          console.log('[Puter] SDK detected.');
+          document.getElementById('puter-badge').style.display = 'inline';
+
+          try {
+            const signedIn = await puter.auth.isSignedIn();
+            if (signedIn) {
+              console.log('[Puter] User is signed in.');
+              document.getElementById('puter-badge').textContent = 'PUTER ACTIVE';
+              document.getElementById('puter-badge').style.color = 'var(--neon-cyan)';
+            } else {
+              console.log('[Puter] User not signed in.');
+              document.getElementById('puter-badge').textContent = 'PUTER (GUEST)';
+              document.getElementById('puter-badge').style.color = '#ffcc00';
+            }
+          } catch (e) {
+            console.warn('[Puter] Auth check failed', e);
+          }
+          return true;
+        }
+        return false;
+      };
+
+      // Poll for 5 seconds
+      const poll = setInterval(async () => {
+        if (await checkPuter() || attempts > 50) {
+          clearInterval(poll);
+        }
+        attempts++;
+      }, 100);
     }
 
     // ═══════════════════════════
@@ -570,6 +621,7 @@
     updateStatus();
     loadHistory();
     initSpeech();
+    initPuter();
     setInterval(updateStatus, 30000);
   </script>
 </body>
