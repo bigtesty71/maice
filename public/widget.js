@@ -19,13 +19,30 @@
             transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
         #maice-widget-container.expanded {
-            width: 400px;
+            width: 450px; /* Wider for persona */
             height: 600px;
             bottom: 20px;
             right: 20px;
             border-radius: 20px;
             box-shadow: 0 12px 40px rgba(0,0,0,0.4);
             overflow: hidden;
+            display: flex;
+        }
+        #maice-widget-persona {
+            width: 150px;
+            height: 100%;
+            background: #000;
+            display: none;
+            border-right: 1px solid rgba(255,255,255,0.1);
+        }
+        #maice-widget-container.expanded #maice-widget-persona {
+            display: block;
+        }
+        #maice-widget-persona img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0.8;
         }
         #maice-widget-launcher {
             width: 60px;
@@ -103,13 +120,19 @@
     closeBtn.innerHTML = '✕';
     closeBtn.onclick = toggleWidget;
 
+    const persona = document.createElement('div');
+    persona.id = 'maice-widget-persona';
+    persona.innerHTML = `<img src="${WIDGET_URL}/images/Macie2.png" alt="Macy">`;
+
     const frame = document.createElement('iframe');
     frame.id = 'maice-widget-frame';
     frame.src = WIDGET_URL;
+    frame.style.flex = "1";
     frame.allow = "microphone; camera; clipboard-write";
 
     container.appendChild(closeBtn);
     container.appendChild(launcher);
+    container.appendChild(persona);
     container.appendChild(frame);
     document.body.appendChild(container);
 
