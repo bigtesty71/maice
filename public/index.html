@@ -520,6 +520,7 @@
       const footerStatus = document.getElementById('footer-status');
 
       if (isRecording) {
+        isRecording = false; // Set state first
         try {
           recognition.stop();
         } catch (e) {
@@ -528,6 +529,9 @@
         stopRecording();
       } else {
         try {
+          // Double check to avoid InvalidStateError if it was somehow already running
+          try { recognition.abort(); } catch (e) { }
+
           input.value = '';
           recognition.start();
           isRecording = true;
@@ -536,7 +540,8 @@
           console.log('[STT] Recording started.');
         } catch (err) {
           console.error('[STT Start Error]', err);
-          if (err.name === 'InvalidStateError' || err.message.includes('already started')) {
+          // If it's already started, just sync our local state
+          if (err.name === 'InvalidStateError') {
             isRecording = true;
             micBtn.classList.add('recording');
             footerStatus.textContent = 'Listening... (Click mic to stop)';
