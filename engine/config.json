@@ -1,0 +1,10 @@
+{
+    "model_name": "mistral-medium-latest",
+    "sifter_model_name": "mistral-small-latest",
+    "vision_model_name": "pixtral-large-latest",
+    "app_context_cap": 64000,
+    "rolling_overlap": 3,
+    "heartbeat_minutes": 30,
+    "disable_telegram": true,
+    "disable_vision": true
+}

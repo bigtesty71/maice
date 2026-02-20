@@ -1,0 +1,7 @@
+{
+    "mistral_model": "medium",
+    "vision_model": "pixtral-large-latest",
+    "sifter_model": "mistral-small-latest",
+    "context_max_tokens": 64000,
+    "heartbeat_minutes": 30
+}

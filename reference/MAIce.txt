@@ -1,0 +1,14 @@
+MAIce
+
+nightshade3271@gmail.com
+
+MISTRAL_API_KEY=MqiFIcgasMYQyS1UEr2D3NpaWgx4PvI8
+
+
+
+BIGT
+MISTRAL_API_KRY=Odmu09Kym8JFcNJdILFy2VgQrCAavDTS
+
+
+Jewells
+MISTRAL_API_KRY=b4rIaHzq4HRLEyOxSM3oU0pw2ikBeyOO

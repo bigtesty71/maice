@@ -1,0 +1,16 @@
+Mistral CLI
+
+Install with:
+
+Win - 
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex" && uv tool install mistral-vibe
+
+or pip -
+pip install mistral-vibe
+
+Mistral Vibe GitHub Repo
+git clone https://github.com/mistralai/mistral-vibe.git
+cd mistral-vibe
+
+
+

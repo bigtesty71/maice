@@ -1,0 +1,1317 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MAIce | Mistral AI companion Experiment</title>
+  <meta name="description" content="MAIce — Mistral AI companion Experiment with MemoryKeep graph memory.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    :root {
+      --bg: #050508;
+      --surface: rgba(20, 20, 30, 0.7);
+      --accent: #9f7aea;
+      --accent-glow: rgba(159, 122, 234, 0.3);
+      --text: #e2e8f0;
+      --text-dim: #94a3b8;
+      --glass-border: rgba(255, 255, 255, 0.1);
+      --neon-orange: #ff8c00;
+      --neon-green: #b5e48c;
+      --neon-cyan: #06d6a0;
+      --neon-rose: #ff0e59;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      scrollbar-width: thin;
+      scrollbar-color: var(--accent) transparent;
+    }
+
+    body {
+      background-color: var(--bg);
+      background-image:
+        radial-gradient(circle at 10% 10%, rgba(159, 122, 234, 0.05) 0%, transparent 40%),
+        radial-gradient(circle at 90% 90%, rgba(255, 140, 0, 0.05) 0%, transparent 40%);
+      color: var(--text);
+      font-family: 'Outfit', sans-serif;
+      margin: 0;
+      height: 100vh;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* ═══════════════════════════════════════
+       SIDEBAR
+       ═══════════════════════════════════════ */
+    .sidebar {
+      width: 300px;
+      background: var(--surface);
+      backdrop-filter: blur(12px);
+      border-right: 1px solid var(--glass-border);
+      display: flex;
+      flex-direction: column;
+      padding: 24px;
+      z-index: 10;
+      overflow-y: auto;
+      flex-shrink: 0;
+    }
+
+    .logo {
+      font-weight: 700;
+      font-size: 1.5rem;
+      letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .logo .icon {
+      color: var(--neon-orange);
+      text-shadow: 0 0 10px rgba(255, 140, 0, 0.5);
+    }
+
+    .sidebar-body {
+      margin-top: 32px;
+    }
+
+    .widget {
+      margin-bottom: 28px;
+    }
+
+    .widget-title {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: var(--text-dim);
+      margin-bottom: 12px;
+    }
+
+    .metric-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--glass-border);
+      padding: 20px;
+      border-radius: 16px;
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+    }
+
+    .metric-mini {
+      text-align: center;
+    }
+
+    .metric-value {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--neon-green);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .metric-label {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      margin-top: 4px;
+    }
+
+    /* Context Gauge */
+    .context-gauge {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--glass-border);
+      padding: 16px;
+      border-radius: 12px;
+      margin-top: 12px;
+    }
+
+    .gauge-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .gauge-label {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+    }
+
+    .gauge-value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      color: var(--neon-cyan);
+      font-weight: 500;
+    }
+
+    .gauge-bar {
+      width: 100%;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .gauge-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--neon-cyan));
+      border-radius: 3px;
+      transition: width 0.6s ease;
+    }
+
+    .gauge-fill.warning {
+      background: linear-gradient(90deg, var(--neon-rose), #ff6b6b);
+    }
+
+    /* Sifter Reports */
+    .report-card {
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 12px;
+      padding: 14px;
+      border: 1px solid var(--glass-border);
+    }
+
+    .report-item {
+      font-size: 0.82rem;
+      padding: 10px 12px;
+      background: rgba(159, 122, 234, 0.06);
+      border-left: 2px solid var(--accent);
+      border-radius: 4px;
+      color: var(--text);
+      margin-bottom: 8px;
+      line-height: 1.5;
+    }
+
+    .report-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .report-empty {
+      font-size: 0.82rem;
+      color: var(--text-dim);
+      font-style: italic;
+    }
+
+    /* Intake Feed */
+    .activity-feed {
+      font-size: 0.78rem;
+      color: var(--text-dim);
+      max-height: 180px;
+      overflow-y: auto;
+    }
+
+    .activity-line {
+      padding: 7px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      line-height: 1.4;
+    }
+
+    .activity-line .ts {
+      color: #555;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+    }
+
+    .sidebar-footer {
+      margin-top: auto;
+      font-size: 0.65rem;
+      color: #444;
+      border-top: 1px solid #111;
+      padding-top: 15px;
+    }
+
+    /* Graph Memory */
+    .graph-panel {
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 12px;
+      padding: 14px;
+      border: 1px solid var(--glass-border);
+    }
+
+    .graph-node-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+
+    .graph-node-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 0.72rem;
+      background: rgba(159, 122, 234, 0.1);
+      border: 1px solid rgba(159, 122, 234, 0.2);
+      color: var(--text);
+    }
+
+    .graph-node-tag .strength {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      color: var(--neon-cyan);
+    }
+
+    .graph-edge {
+      font-size: 0.78rem;
+      color: var(--text-dim);
+      padding: 5px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+      line-height: 1.4;
+    }
+
+    .graph-edge .rel {
+      color: var(--neon-orange);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+    }
+
+    .graph-empty {
+      font-size: 0.82rem;
+      color: var(--text-dim);
+      font-style: italic;
+    }
+
+    /* Task Tracker */
+    .task-list {
+      font-size: 0.78rem;
+    }
+
+    .task-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+      color: var(--text-dim);
+      line-height: 1.4;
+    }
+
+    .task-item.done {
+      text-decoration: line-through;
+      opacity: 0.5;
+    }
+
+    .task-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+
+    .task-badge.pending {
+      background: rgba(255, 140, 0, 0.15);
+      color: var(--neon-orange);
+    }
+
+    .task-badge.complete {
+      background: rgba(181, 228, 140, 0.15);
+      color: var(--neon-green);
+    }
+
+    .task-empty {
+      font-size: 0.82rem;
+      color: var(--text-dim);
+      font-style: italic;
+    }
+
+    .task-stats {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 10px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      color: var(--text-dim);
+    }
+
+    .task-stats span {
+      color: var(--neon-orange);
+    }
+
+    /* Image upload */
+    .upload-btn {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--glass-border);
+      color: var(--text-dim);
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      transition: all 0.3s;
+      flex-shrink: 0;
+    }
+
+    .upload-btn:hover {
+      border-color: var(--neon-cyan);
+      color: var(--neon-cyan);
+    }
+
+    .image-preview {
+      max-width: 200px;
+      max-height: 120px;
+      border-radius: 8px;
+      border: 1px solid var(--glass-border);
+      margin: 8px 0;
+    }
+
+    /* Mic button */
+    .mic-btn {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--glass-border);
+      color: var(--text-dim);
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+      transition: all 0.3s;
+      flex-shrink: 0;
+    }
+
+    .mic-btn:hover {
+      border-color: var(--neon-cyan);
+      color: var(--neon-cyan);
+    }
+
+    .mic-btn.recording {
+      border-color: #ff0e59;
+      color: #ff0e59;
+      animation: mic-pulse 1s ease-in-out infinite;
+    }
+
+    @keyframes mic-pulse {
+
+      0%,
+      100% {
+        box-shadow: 0 0 0 0 rgba(255, 14, 89, 0.4);
+      }
+
+      50% {
+        box-shadow: 0 0 12px 4px rgba(255, 14, 89, 0.2);
+      }
+    }
+
+    .neural-pulse {
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      background: var(--neon-green);
+      border-radius: 50%;
+      margin-right: 6px;
+      box-shadow: 0 0 8px var(--neon-green);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        transform: scale(1);
+        opacity: 1;
+      }
+
+      50% {
+        transform: scale(1.5);
+        opacity: 0.5;
+      }
+    }
+
+    /* ═══════════════════════════════════════
+       MAIN CONTENT
+       ═══════════════════════════════════════ */
+    .main-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      min-width: 0;
+    }
+
+    /* Header */
+    .header {
+      padding: 16px 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--glass-border);
+      background: rgba(5, 5, 8, 0.5);
+      backdrop-filter: blur(4px);
+      flex-shrink: 0;
+    }
+
+    .header-label {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .header-label .active {
+      color: var(--neon-green);
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .action-btn {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--glass-border);
+      color: var(--text-dim);
+      padding: 7px 14px;
+      border-radius: 8px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-family: inherit;
+    }
+
+    .action-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .action-btn.danger:hover {
+      border-color: var(--neon-rose);
+      color: var(--neon-rose);
+    }
+
+    /* ═══════════════════════════════════════
+       CHAT AREA
+       ═══════════════════════════════════════ */
+    #chat-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 32px 40px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .message {
+      max-width: 82%;
+      padding: 18px 20px;
+      border-radius: 16px;
+      line-height: 1.65;
+      animation: fadeIn 0.35s ease-out;
+      position: relative;
+      font-size: 0.95rem;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .message.user {
+      align-self: flex-end;
+      background: linear-gradient(135deg, #2d3748, #1a202c);
+      border: 1px solid var(--glass-border);
+      color: white;
+      border-bottom-right-radius: 4px;
+    }
+
+    .message.ai {
+      align-self: flex-start;
+      background: var(--surface);
+      border: 1px solid rgba(159, 122, 234, 0.15);
+      color: var(--text);
+      border-bottom-left-radius: 4px;
+      margin-top: 18px;
+      /* Space for avatar */
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    }
+
+    .message.ai::before {
+      content: '';
+      position: absolute;
+      top: -24px;
+      left: 0;
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background-image: url('images/4.png');
+      background-size: cover;
+      background-position: center;
+      border: 2px solid var(--accent);
+      box-shadow: 0 0 10px var(--accent-glow);
+    }
+
+    .message.system-note {
+      align-self: center;
+      font-size: 0.8rem;
+      color: var(--text-dim);
+      font-style: italic;
+      background: transparent;
+      padding: 10px;
+      max-width: 100%;
+    }
+
+    /* Markdown inside AI messages */
+    .message.ai p {
+      margin: 0 0 10px 0;
+    }
+
+    .message.ai p:last-child {
+      margin-bottom: 0;
+    }
+
+    .message.ai code {
+      background: rgba(0, 0, 0, 0.3);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85em;
+      color: var(--neon-orange);
+    }
+
+    .message.ai pre {
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid var(--glass-border);
+      border-radius: 8px;
+      padding: 14px;
+      overflow-x: auto;
+      margin: 10px 0;
+    }
+
+    .message.ai pre code {
+      background: none;
+      padding: 0;
+      color: var(--text);
+    }
+
+    .message.ai strong {
+      color: var(--accent);
+    }
+
+    .message.ai ul,
+    .message.ai ol {
+      padding-left: 20px;
+      margin: 8px 0;
+    }
+
+    .message.ai li {
+      margin-bottom: 4px;
+    }
+
+    .message.ai blockquote {
+      border-left: 3px solid var(--accent);
+      padding-left: 12px;
+      margin: 8px 0;
+      color: var(--text-dim);
+      font-style: italic;
+    }
+
+    .message.ai a {
+      color: var(--neon-cyan);
+      text-decoration: underline;
+    }
+
+    /* Typing dots */
+    .typing-dots {
+      display: flex;
+      gap: 5px;
+      padding: 4px 0;
+    }
+
+    .typing-dots span {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: bounce 1.4s ease-in-out infinite;
+    }
+
+    .typing-dots span:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+
+    .typing-dots span:nth-child(3) {
+      animation-delay: 0.4s;
+    }
+
+    @keyframes bounce {
+
+      0%,
+      60%,
+      100% {
+        transform: translateY(0);
+        opacity: 0.4;
+      }
+
+      30% {
+        transform: translateY(-7px);
+        opacity: 1;
+      }
+    }
+
+    /* ═══════════════════════════════════════
+       INPUT BAR
+       ═══════════════════════════════════════ */
+    .input-wrapper {
+      padding: 24px 40px 28px;
+      background: linear-gradient(to top, var(--bg) 80%, transparent);
+      flex-shrink: 0;
+    }
+
+    .input-container {
+      background: var(--surface);
+      border: 1px solid var(--glass-border);
+      padding: 8px 12px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+      transition: border-color 0.3s;
+    }
+
+    .input-container:focus-within {
+      border-color: var(--accent);
+    }
+
+    #user-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: white;
+      padding: 12px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      outline: none;
+    }
+
+    #user-input::placeholder {
+      color: #555;
+    }
+
+    .send-btn {
+      background: var(--accent);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 10px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: inherit;
+      font-size: 0.9rem;
+    }
+
+    .send-btn:hover {
+      transform: scale(1.02);
+      filter: brightness(1.1);
+    }
+
+    .send-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .input-footer {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 8px;
+      font-size: 0.65rem;
+      color: #444;
+      padding: 0 4px;
+    }
+
+    /* ═══════════════════════════════════════
+       RESPONSIVE
+       ═══════════════════════════════════════ */
+    @media (max-width: 768px) {
+      .sidebar {
+        display: none;
+      }
+
+      #chat-container {
+        padding: 20px 16px;
+      }
+
+      .input-wrapper {
+        padding: 16px;
+      }
+
+      .header {
+        padding: 12px 16px;
+      }
+
+      .message {
+        max-width: 92%;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ═══ SIDEBAR ═══ -->
+  <div class="sidebar">
+    <div class="logo">
+      <span class="icon">⚡</span> MAIce
+    </div>
+
+    <div class="sidebar-body">
+      <!-- Neural Metrics -->
+      <div class="widget">
+        <div class="widget-title">Neural Metrics</div>
+        <div class="metric-card">
+          <div class="metric-mini">
+            <div id="exp-val" class="metric-value">0</div>
+            <div class="metric-label">Experiences</div>
+          </div>
+          <div class="metric-mini">
+            <div id="dom-val" class="metric-value">0</div>
+            <div class="metric-label">Domain</div>
+          </div>
+          <div class="metric-mini">
+            <div id="graph-nodes-val" class="metric-value" style="color: var(--neon-cyan)">0</div>
+            <div class="metric-label">Nodes</div>
+          </div>
+          <div class="metric-mini">
+            <div id="graph-edges-val" class="metric-value" style="color: var(--neon-orange)">0</div>
+            <div class="metric-label">Edges</div>
+          </div>
+        </div>
+
+        <!-- Context Gauge -->
+        <div class="context-gauge">
+          <div class="gauge-header">
+            <span class="gauge-label">Stream Context</span>
+            <span class="gauge-value" id="ctx-pct">0%</span>
+          </div>
+          <div class="gauge-bar">
+            <div class="gauge-fill" id="ctx-fill" style="width: 0%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sifter Reports -->
+      <div class="widget">
+        <div class="widget-title">Sleep Cycle Reports (The Sifter)</div>
+        <div class="report-card" id="reports">
+          <div class="report-empty">Awaiting first sleep simulation...</div>
+        </div>
+      </div>
+
+      <!-- Intake Valve -->
+      <div class="widget">
+        <div class="widget-title">Intake Valve (Live)</div>
+        <div id="activity" class="activity-feed">
+          <div class="activity-line">Core protocols loaded.</div>
+        </div>
+      </div>
+
+      <!-- Knowledge Graph -->
+      <div class="widget">
+        <div class="widget-title">Knowledge Graph</div>
+        <div class="graph-panel" id="graph-panel">
+          <div id="graph-nodes-display" class="graph-node-list"></div>
+          <div id="graph-edges-display"></div>
+          <div class="graph-empty" id="graph-empty">Graph builds as you talk...</div>
+        </div>
+      </div>
+
+      <!-- Task Tracker -->
+      <div class="widget">
+        <div class="widget-title">Task Tracker</div>
+        <div class="task-stats" id="task-stats"></div>
+        <div class="task-list" id="task-list">
+          <div class="task-empty">No tasks yet. Ask MAIce to create one.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      USER: JEWELLS | <span class="neural-pulse"></span>SESSION STABLE
+    </div>
+  </div>
+
+  <!-- ═══ MAIN CONTENT ═══ -->
+  <div class="main-content">
+    <div class="header">
+      <div class="header-label">
+        PROTOCOL: <span class="active">NEURAL-KEEP (AGENTIC)</span> · MAIce ENGINE
+      </div>
+      <div class="header-actions">
+        <button id="tts-toggle" onclick="toggleTTS()" class="action-btn" title="Toggle Voice">🔈 ON</button>
+        <button onclick="copyHistory()" class="action-btn">COPY LOGS</button>
+        <button onclick="resetBrain()" class="action-btn danger">RESET</button>
+      </div>
+    </div>
+
+    <div id="chat-container">
+      <div class="message system-note">MAIce Neural Bridge Connected. MemoryKeep v3 + Graph + Vision + Email + Browser +
+        Telegram Active. 11 agentic tools online. Heartbeat engaged.</div>
+    </div>
+
+    <div class="input-wrapper">
+      <div class="input-container">
+        <input id="image-upload" type="file" accept="image/*" style="display:none" onchange="handleImageSelect(event)">
+        <button class="upload-btn" onclick="document.getElementById('image-upload').click()"
+          title="Upload image for vision">📷</button>
+        <button id="mic-btn" class="mic-btn" onclick="toggleMic()" title="Speech-to-text">🎙️</button>
+        <input id="user-input" type="text" placeholder="Transceive input..." autocomplete="off">
+        <button id="send-btn" onclick="handleSend()" class="send-btn">SEND</button>
+      </div>
+      <div id="image-preview-container" style="padding: 0 4px;"></div>
+      <div class="input-footer">
+        <span>MAIce · Mistral AI companion Experiment</span>
+        <span id="footer-status">Ready</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API = '';
+    let isProcessing = false;
+
+    // ═══════════════════════════
+    // STATUS POLLING
+    // ═══════════════════════════
+    async function updateStatus() {
+      try {
+        const res = await fetch(`${API}/status`);
+        const data = await res.json();
+
+        document.getElementById('exp-val').textContent = data.experience_count || 0;
+        document.getElementById('dom-val').textContent = data.domain_count || 0;
+
+        // Context gauge
+        const pct = data.context_cap
+          ? Math.round((data.stream_tokens / data.context_cap) * 100)
+          : 0;
+        document.getElementById('ctx-pct').textContent = pct + '%';
+        const fill = document.getElementById('ctx-fill');
+        fill.style.width = pct + '%';
+        fill.className = 'gauge-fill' + (pct > 70 ? ' warning' : '');
+
+        // Sifter reports
+        if (data.sifter_patterns && data.sifter_patterns.length > 0) {
+          document.getElementById('reports').innerHTML = data.sifter_patterns
+            .map(p => `<div class="report-item">${escapeHtml(p.content)}</div>`)
+            .join('');
+        }
+
+        // Intake feed
+        if (data.recent_experiences && data.recent_experiences.length > 0) {
+          document.getElementById('activity').innerHTML = data.recent_experiences
+            .map(e => {
+              const ts = e.timestamp ? e.timestamp.split(' ')[1] || '' : '';
+              return `<div class="activity-line"><span class="ts">${ts}</span> ${escapeHtml(e.content)}</div>`;
+            }).join('');
+        }
+
+        // Graph memory
+        document.getElementById('graph-nodes-val').textContent = data.graph_nodes || 0;
+        document.getElementById('graph-edges-val').textContent = data.graph_edges || 0;
+
+        if (data.graph_top_nodes && data.graph_top_nodes.length > 0) {
+          document.getElementById('graph-empty').style.display = 'none';
+          document.getElementById('graph-nodes-display').innerHTML = data.graph_top_nodes
+            .map(n => `<span class="graph-node-tag">${escapeHtml(n.label)} <span class="strength">${n.strength}</span></span>`)
+            .join('');
+        } else {
+          document.getElementById('graph-empty').style.display = 'block';
+          document.getElementById('graph-nodes-display').innerHTML = '';
+        }
+
+        if (data.graph_recent_edges && data.graph_recent_edges.length > 0) {
+          document.getElementById('graph-edges-display').innerHTML = data.graph_recent_edges
+            .map(e => `<div class="graph-edge">${escapeHtml(e.source_label)} <span class="rel">—[${escapeHtml(e.relationship)}]→</span> ${escapeHtml(e.target_label)}</div>`)
+            .join('');
+        } else {
+          document.getElementById('graph-edges-display').innerHTML = '';
+        }
+        // Task tracker
+        if (data.tasks_pending !== undefined) {
+          document.getElementById('task-stats').innerHTML =
+            `Pending: <span>${data.tasks_pending}</span> · Done: <span>${data.tasks_done}</span>`;
+        }
+        if (data.tasks_recent && data.tasks_recent.length > 0) {
+          document.getElementById('task-list').innerHTML = data.tasks_recent
+            .map(t => {
+              const isDone = t.status === 'done';
+              return `<div class="task-item${isDone ? ' done' : ''}">
+                <span class="task-badge ${isDone ? 'complete' : 'pending'}">${isDone ? '✓' : '#' + t.id}</span>
+                ${escapeHtml(t.description)}
+              </div>`;
+            }).join('');
+        }
+      } catch {
+        document.querySelector('.header-label').innerHTML =
+          'PROTOCOL: <span style="color: #ff0e59">LINK LOST</span>';
+      }
+    }
+
+    // ═══════════════════════════
+    // SEND MESSAGE
+    // ═══════════════════════════
+    let pendingImage = null;
+
+    function handleImageSelect(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        pendingImage = e.target.result; // data:image/...;base64,...
+        document.getElementById('image-preview-container').innerHTML =
+          `<img src="${pendingImage}" class="image-preview"> <button onclick="clearImage()" style="background:none;border:none;color:var(--neon-orange);cursor:pointer;font-size:0.8rem;">✕ Remove</button>`;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function clearImage() {
+      pendingImage = null;
+      document.getElementById('image-preview-container').innerHTML = '';
+      document.getElementById('image-upload').value = '';
+    }
+
+    async function handleSend() {
+      const input = document.getElementById('user-input');
+      const text = input.value.trim();
+      if ((!text && !pendingImage) || isProcessing) return;
+
+      isProcessing = true;
+      document.getElementById('send-btn').disabled = true;
+      input.value = '';
+
+      // Show user message
+      const displayText = pendingImage ? `📷 ${text || 'What do you see?'}` : text;
+      addMessage(displayText, 'user');
+
+      // Show image preview in chat if attached
+      if (pendingImage) {
+        const container = document.getElementById('chat-container');
+        const imgDiv = document.createElement('div');
+        imgDiv.className = 'message user';
+        imgDiv.innerHTML = `<img src="${pendingImage}" style="max-width:300px;border-radius:8px;">`;
+        container.appendChild(imgDiv);
+        container.scrollTop = container.scrollHeight;
+      }
+
+      document.getElementById('footer-status').textContent = pendingImage ? 'Analyzing image...' : 'Thinking...';
+
+      // Typing indicator
+      const thinkingId = 'ai-thinking-' + Date.now();
+      addTyping(thinkingId);
+
+      try {
+        let data;
+        if (pendingImage) {
+          // Vision endpoint
+          const res = await fetch(`${API}/vision`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image: pendingImage, message: text || 'What do you see in this image?' })
+          });
+          data = await res.json();
+          clearImage();
+        } else {
+          // Normal chat endpoint
+          const res = await fetch(`${API}/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: text })
+          });
+          data = await res.json();
+        }
+
+        removeElement(thinkingId);
+        addMessage(data.reply || data.error || 'No signal received.', 'ai');
+        updateStatus();
+      } catch (err) {
+        removeElement(thinkingId);
+        addMessage(`⚠ Connection error: ${err.message}`, 'ai');
+      }
+
+      isProcessing = false;
+      document.getElementById('send-btn').disabled = false;
+      document.getElementById('footer-status').textContent = 'Ready';
+      input.focus();
+
+      // If continuous speech was active, restart it to clear the session buffer
+      // (Otherwise previous text keeps re-appearing)
+      if (isRecording && recognition) {
+        recognition.abort(); // Stop listening
+        setTimeout(() => {
+          try {
+            recognition.start(); // Restart fresh
+            document.getElementById('footer-status').textContent = 'Listening... (Click mic to stop)';
+          } catch (e) { console.error('Restart speech failed', e); }
+        }, 300);
+      }
+    }
+
+    // ═══════════════════════════
+    // MESSAGE RENDERING
+    // ═══════════════════════════
+    function addMessage(text, role) {
+      const container = document.getElementById('chat-container');
+      const div = document.createElement('div');
+      div.className = `message ${role}`;
+      div.innerHTML = role === 'ai' ? marked.parse(text) : escapeHtml(text);
+      container.appendChild(div);
+      container.scrollTop = container.scrollHeight;
+
+      // TTS: Speak if it's AI and not muted
+      if (role === 'ai' && isTTSActive) {
+        speakText(text);
+      }
+    }
+
+    function addTyping(id) {
+      const container = document.getElementById('chat-container');
+      const div = document.createElement('div');
+      div.className = 'message ai';
+      div.id = id;
+      div.innerHTML = '<div class="typing-dots"><span></span><span></span><span></span></div>';
+      container.appendChild(div);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function removeElement(id) {
+      const el = document.getElementById(id);
+      if (el) el.remove();
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // ═══════════════════════════
+    // HISTORY & ACTIONS
+    // ═══════════════════════════
+    async function loadHistory() {
+      try {
+        const res = await fetch(`${API}/history`);
+        const data = await res.json();
+        if (data && data.history && data.history.length > 0) {
+          const container = document.getElementById('chat-container');
+          container.innerHTML = '';
+          data.history.forEach(m => {
+            if (m.role !== 'system') {
+              addMessage(m.content, m.role === 'user' ? 'user' : 'ai');
+            }
+          });
+        }
+      } catch { /* first load */ }
+    }
+
+    async function resetBrain() {
+      if (!confirm('⚠ This will wipe all memories. Are you sure?')) return;
+      try {
+        await fetch(`${API}/reset`, { method: 'POST' });
+        document.getElementById('chat-container').innerHTML =
+          '<div class="message system-note">Brain wiped. Neural Bridge reconnected.</div>';
+        updateStatus();
+      } catch (err) {
+        alert('Reset failed: ' + err.message);
+      }
+    }
+
+    async function copyHistory() {
+      const msgs = Array.from(document.querySelectorAll('.message'))
+        .filter(m => !m.classList.contains('system-note'))
+        .map(m => (m.classList.contains('user') ? 'JEWELLS: ' : 'MAIce: ') + m.innerText)
+        .join('\n\n');
+      await navigator.clipboard.writeText(msgs);
+      alert('Memory log synchronized to clipboard.');
+    }
+
+    // ═══════════════════════════
+    // KEYBOARD
+    // ═══════════════════════════
+    document.getElementById('user-input').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') handleSend();
+    });
+
+    // ═══════════════════════════
+    // TEXT-TO-SPEECH (TTS)
+    // ═══════════════════════════
+    let isTTSActive = true;
+    const synth = window.speechSynthesis;
+
+    function toggleTTS() {
+      isTTSActive = !isTTSActive;
+      const btn = document.getElementById('tts-toggle');
+      if (isTTSActive) {
+        btn.textContent = '🔈 ON';
+        btn.style.opacity = '1';
+      } else {
+        btn.textContent = '🔇 OFF';
+        btn.style.opacity = '0.5';
+        synth.cancel(); // Stop speaking immediately
+      }
+    }
+
+    function speakText(markdown) {
+      if (!isTTSActive) return;
+
+      // Strip markdown for cleaner speech
+      // 1. Remove code blocks
+      let clean = markdown.replace(/```[\s\S]*?```/g, " [Code Block] ");
+      // 2. Remove inline code
+      clean = clean.replace(/`([^`]+)`/g, "$1");
+      // 3. Remove links [text](url) -> text
+      clean = clean.replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1");
+      // 4. Remove bold/italic
+      clean = clean.replace(/[\*\_]{1,3}([^\*\_]+)[\*\_]{1,3}/g, "$1");
+
+      const utterance = new SpeechSynthesisUtterance(clean);
+
+      // Try to find a female voice if available, otherwise default
+      const voices = synth.getVoices();
+      const preferred = voices.find(v => v.name.includes('Female') || v.name.includes('Zira') || v.name.includes('Google US English'));
+      if (preferred) utterance.voice = preferred;
+
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+      synth.speak(utterance);
+    }
+
+    // Load voices immediately so they fail gracefully if not ready
+    if (synth.onvoiceschanged !== undefined) {
+      synth.onvoiceschanged = () => { };
+    }
+
+    // ═══════════════════════════
+    // SPEECH-TO-TEXT
+    // ═══════════════════════════
+    let recognition = null;
+    let isRecording = false;
+
+    function initSpeech() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        document.getElementById('mic-btn').title = 'Speech not supported in this browser';
+        document.getElementById('mic-btn').style.opacity = '0.3';
+        return;
+      }
+      recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+
+      recognition.onresult = (event) => {
+        let transcript = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript;
+        }
+        const input = document.getElementById('user-input');
+        // Only update input if we have new text, appending if needed or replacing
+        // For simplicity, just replacing the current input value with the full session transcript
+        // But since it's continuous, event.results accumulates. 
+        // Actually, let's just use the latest result to append? No, better to reconstruct.
+
+        let fullTranscript = '';
+        for (let i = 0; i < event.results.length; ++i) {
+          fullTranscript += event.results[i][0].transcript;
+        }
+        input.value = fullTranscript;
+      };
+
+      recognition.onerror = (event) => {
+        console.error('[STT Error]', event.error);
+        if (event.error === 'no-speech') return;
+        stopRecording();
+      };
+
+      recognition.onend = () => {
+        if (isRecording) {
+          // If it stopped but we didn't ask it to, users might be annoyed. 
+          // But let's just stop to be safe and let them restart.
+          stopRecording();
+        }
+      };
+    }
+
+    function toggleMic() {
+      if (!recognition) {
+        alert('Speech recognition is not supported in this browser. Use Chrome or Edge.');
+        return;
+      }
+      if (isRecording) {
+        // Stop recording
+        try {
+          recognition.stop();
+        } catch (e) {
+          console.warn('[STT] Stop failed:', e);
+        }
+        stopRecording();
+      } else {
+        // Start recording
+        try {
+          // Clear input if starting new recording? 
+          // Maybe append? Let's clear for now as it's usually a new message.
+          document.getElementById('user-input').value = '';
+          recognition.start();
+          isRecording = true;
+          document.getElementById('mic-btn').classList.add('recording');
+          document.getElementById('footer-status').textContent = 'Listening... (Click mic to stop)';
+        } catch (err) {
+          console.error('[STT Start Error]', err);
+          if (err.name === 'InvalidStateError' || err.message.includes('already started')) {
+            // It's already running, so treat as if we successfully started or are already recording
+            console.log('[STT] Recovering from already-started state.');
+            isRecording = true;
+            document.getElementById('mic-btn').classList.add('recording');
+            document.getElementById('footer-status').textContent = 'Listening... (Click mic to stop)';
+          } else {
+            alert('Microphone error: ' + err.message);
+            stopRecording();
+          }
+        }
+      }
+    }
+
+    function stopRecording() {
+      isRecording = false;
+      document.getElementById('mic-btn').classList.remove('recording');
+      const status = document.getElementById('footer-status');
+      if (status && status.textContent.includes('Listening')) {
+        status.textContent = 'Ready';
+      }
+    }
+
+    // ═══════════════════════════
+    // INIT
+    // ═══════════════════════════
+    updateStatus();
+    loadHistory();
+    initSpeech();
+    setInterval(updateStatus, 30000);
+  </script>
+</body>
+
+</html>

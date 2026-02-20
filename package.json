@@ -1,0 +1,20 @@
+{
+  "name": "mistral-memorykeep",
+  "version": "1.0.0",
+  "description": "Mistral AI Chatbot with MemoryKeep Memory System",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "@mistralai/mistralai": "^1.0.0",
+    "better-sqlite3": "^11.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.0",
+    "express": "^4.21.0",
+    "node-telegram-bot-api": "^0.67.0",
+    "nodemailer": "^8.0.1",
+    "puppeteer": "^24.37.5"
+  }
+}
