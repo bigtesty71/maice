@@ -275,36 +275,35 @@ class MemoryKeepEngine {
           }
         });
 
-        // Ensure we start with a user turn (it usually does, but safety first)
+        // Ensure we start with a user turn
         if (contents.length > 0 && contents[0].role === 'model') {
           contents.unshift({ role: 'user', parts: [{ text: '[Initializing conversation]' }] });
         }
 
-        const result = await model.generateContent({
-          contents,
-          generationConfig: {
-            temperature,
-            maxOutputTokens: 4096,
-          },
-        });
+        // --- 60s Timeout Safety ---
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Neural link timed out (60s)')), 60000));
 
-        const response = result.response;
-        const text = response.text();
+        const result = await Promise.race([
+          model.generateContent({
+            contents,
+            generationConfig: { temperature, maxOutputTokens: 2048 },
+          }),
+          timeoutPromise
+        ]);
 
-        // Gemini doesn't always provide usage in the same format, but we can try to extract it
-        if (response.usageMetadata) {
-          console.log(`[Token Usage] ${purpose}: ${JSON.stringify(response.usageMetadata)}`);
+        const text = result.response.text();
+
+        if (result.response.usageMetadata) {
+          console.log(`[Token Usage] ${purpose}: ${JSON.stringify(result.response.usageMetadata)}`);
         }
 
         return text;
       } catch (err) {
         process.stdout.write(`\n❌ [LLM Error: ${purpose}] ${err.message}\n`);
-        if (err.stack) console.error(err.stack);
-        this.llmBusy = false;
-
-        // Return empty or error message if inference
-        if (purpose === 'inference') return `[System Error] I'm having trouble connecting to my neural core right now. (Ref: ${err.message.slice(0, 50)})`;
+        if (purpose === 'inference') return `[System Error] Neural core timeout or disconnect. (Ref: ${err.message.slice(0, 50)})`;
         return '';
+      } finally {
+        this.llmBusy = false; // RELEASE LOCK
       }
     };
 
