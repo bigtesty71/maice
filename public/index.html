@@ -113,9 +113,24 @@
         PROTOCOL: <span class="active">NEURAL-KEEP (AGENTIC)</span> · MAIce ENGINE
       </div>
       <div class="header-actions">
+        <button id="metrics-btn" class="action-btn" onclick="toggleMetrics()" title="Neural Metrics">🧠 STATS</button>
         <button id="tts-toggle" onclick="toggleTTS()" class="action-btn" title="Toggle Voice">🔈 ON</button>
         <button onclick="copyHistory()" class="action-btn">COPY LOGS</button>
         <button onclick="resetBrain()" class="action-btn danger">RESET</button>
+      </div>
+    </div>
+
+    <!-- Metrics Overlay (for Widget Mode) -->
+    <div id="metrics-overlay" class="metrics-overlay">
+      <div class="metrics-header">
+        <span>NEURAL STATUS</span>
+        <button onclick="toggleMetrics()">✕</button>
+      </div>
+      <div id="metrics-content">
+        <!-- Cloned from sidebar widgets via JS -->
+      </div>
+      <div class="metrics-footer">
+        <button onclick="resetBrain()" class="action-btn danger" style="width:100%">WIPE ALL MEMORY</button>
       </div>
     </div>
 
@@ -461,7 +476,7 @@
         return new Promise((resolve) => {
           const utterance = new SpeechSynthesisUtterance(chunk.trim());
           const voices = synth.getVoices();
-          
+
           // Preferred MAGGIE voice (Zira or Female English)
           const preferred = voices.find(v => v.name.includes('Zira')) ||
             voices.find(v => v.lang === 'en-US' && v.name.includes('Female')) ||
