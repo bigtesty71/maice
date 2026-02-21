@@ -27,7 +27,11 @@ class MemoryKeepEngine {
     this.config = JSON.parse(fs.readFileSync(cfgFile, 'utf-8'));
 
     // --- Google GenAI Client ---
-    this.genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+    this.apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
+    if (!this.apiKey || this.apiKey === 'YOUR_GOOGLE_AI_API_KEY_HERE') {
+      console.warn('[MAGGIE] WARNING: No valid Google/Gemini API key found in .env.');
+    }
+    this.genAI = new GoogleGenerativeAI(this.apiKey);
 
     // --- Database ---
     this.isVercel = process.env.VERCEL === '1';
@@ -230,22 +234,41 @@ class MemoryKeepEngine {
       try {
         const model = this.genAI.getGenerativeModel({ model: modelId });
 
-        // Transform messages to Gemini format
-        // Mistral: { role, content } -> Gemini: { role: 'user'|'model', parts: [{ text }] }
-        const contents = messages.map(m => {
-          let role = m.role;
-          if (role === 'assistant') role = 'model';
-          if (role === 'system') {
-            // System instructions are best handled via model config in newer SDKs, 
-            // but for compatibility we can prepend to the first user message or use it as is if supported.
-            // Here we'll treat it as 'user' for simplicity if it's the first message, 
-            // or just keep it as 'system' if the SDK allows (newer versions do).
+        // Transform messages to Gemini/Gemma format
+        // Gemma 3 STRICTNESS: Alternating turns (User -> Model) and NO 'system' role.
+        let contents = [];
+        let systemInstructions = '';
+
+        messages.forEach((m, idx) => {
+          if (m.role === 'system') {
+            systemInstructions += (systemInstructions ? '\n\n' : '') + m.content;
+          } else {
+            let role = m.role === 'assistant' ? 'model' : 'user';
+
+            // If we have system instructions and this is the first user message, prepend them.
+            let content = m.content;
+            if (role === 'user' && systemInstructions && !contents.find(c => c.role === 'user')) {
+              content = `[SYSTEM INSTRUCTIONS]\n${systemInstructions}\n\n[USER MESSAGE]\n${content}`;
+            }
+
+            // Ensure turns alternate strictly
+            const lastTurn = contents[contents.length - 1];
+            if (lastTurn && lastTurn.role === role) {
+              // Same role consecutive - merge them or inject a placeholder turn (Gemini/Gemma fix)
+              lastTurn.parts[0].text += '\n\n' + content;
+            } else {
+              contents.push({
+                role,
+                parts: [{ text: content }]
+              });
+            }
           }
-          return {
-            role: role === 'system' ? 'user' : role, // Fallout role for system
-            parts: [{ text: m.content }]
-          };
         });
+
+        // Ensure we start with a user turn (it usually does, but safety first)
+        if (contents.length > 0 && contents[0].role === 'model') {
+          contents.unshift({ role: 'user', parts: [{ text: '[Initializing conversation]' }] });
+        }
 
         const result = await model.generateContent({
           contents,
