@@ -260,6 +260,13 @@
 
       isProcessing = true;
       document.getElementById('send-btn').disabled = true;
+
+      // Suppress STT while thinking/speaking
+      if (isUserWantsToListen && recognition) {
+        isSpeechSuppressed = true;
+        if (isBrowserListening) recognition.abort();
+      }
+
       input.value = '';
 
       // Show user message
@@ -285,16 +292,14 @@
       try {
         let data;
         if (pendingImage) {
-          // Vision endpoint
           const res = await fetch(`${API}/vision`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ image: pendingImage, message: text || 'What do you see in this image?' })
+            body: JSON.stringify({ image: pendingImage, message: text || 'What do you see?' })
           });
           data = await res.json();
           clearImage();
         } else {
-          // Normal chat endpoint
           const res = await fetch(`${API}/chat`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -304,28 +309,25 @@
         }
 
         removeElement(thinkingId);
-        addMessage(data.reply || data.error || 'No signal received.', 'ai');
+        addMessage(data.reply || data.error || 'No signal.', 'ai');
         updateStatus();
       } catch (err) {
         removeElement(thinkingId);
-        addMessage(`⚠ Connection error: ${err.message}`, 'ai');
-      }
+        addMessage(`⚠ Error: ${err.message}`, 'ai');
+      } finally {
+        isProcessing = false;
+        document.getElementById('send-btn').disabled = false;
+        document.getElementById('footer-status').textContent = 'Ready';
+        input.focus();
 
-      isProcessing = false;
-      document.getElementById('send-btn').disabled = false;
-      document.getElementById('footer-status').textContent = 'Ready';
-      input.focus();
-
-      // If continuous speech was active, restart it to clear the session buffer
-      if (isUserWantsToListen && recognition) {
-        recognition.abort(); // Stop listening
+        // Release suppression if TTS isn't going to handle it
         setTimeout(() => {
-          try {
-            if (isUserWantsToListen) {
-              recognition.start(); // Restart fresh
-              document.getElementById('footer-status').textContent = 'Listening... (Click mic to stop)';
+          if (!window.speechSynthesis.speaking) {
+            isSpeechSuppressed = false;
+            if (isUserWantsToListen && !isBrowserListening) {
+              try { recognition?.start(); } catch (e) { }
             }
-          } catch (e) { console.error('Restart speech failed', e); }
+          }
         }, 300);
       }
     }
@@ -341,8 +343,8 @@
       container.appendChild(div);
       container.scrollTop = container.scrollHeight;
 
-      // TTS: Speak if it's AI, not muted, and not an error/system note
-      if (role === 'ai' && isTTSActive && !text.includes('⚠ Connection error')) {
+      // TTS: Speak if it's AI, not muted, and not an error
+      if (role === 'ai' && isTTSActive && !text.includes('⚠ Error')) {
         speakText(text);
       }
     }
@@ -440,22 +442,21 @@
     async function speakText(text) {
       if (!isTTSActive) return;
 
-      // Strip markdown for cleaner speech
+      isSpeechSuppressed = true;
+      if (isBrowserListening) recognition?.abort();
+
       let clean = text.replace(/```[\s\S]*?```/g, " [Code block] ");
       clean = clean.replace(/`([^`]+)`/g, "$1");
       clean = clean.replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1");
       clean = clean.replace(/[\*\_]{1,3}([^\*\_]+)[\*\_]{1,3}/g, "$1");
-      clean = clean.replace(/[#\-\>\+]/g, ""); // Strip other MD chars
+      clean = clean.replace(/[#\-\>\+]/g, "");
 
       try {
         const synth = window.speechSynthesis;
-        synth.cancel(); // Stop any current speech
+        synth.cancel();
 
         const utterance = new SpeechSynthesisUtterance(clean);
-
-        // Asynchronously load voices
         const voices = synth.getVoices();
-        // Priority: Microsoft Zira (Natural), Google US English, or any English female voice
         const preferred = voices.find(v => v.name.includes('Zira')) ||
           voices.find(v => v.lang === 'en-US' && v.name.includes('Female')) ||
           voices.find(v => v.lang.startsWith('en'));
@@ -464,10 +465,17 @@
         utterance.rate = 1.0;
         utterance.pitch = 1.1;
 
-        console.log('[TTS] Speaking with voice:', preferred ? preferred.name : 'Default');
+        utterance.onend = () => {
+          isSpeechSuppressed = false;
+          if (isUserWantsToListen && !isBrowserListening) {
+            try { recognition.start(); } catch (e) { }
+          }
+        };
+
         synth.speak(utterance);
       } catch (err) {
         console.error('[TTS Error]', err);
+        isSpeechSuppressed = false;
       }
     }
 
@@ -477,6 +485,7 @@
     let recognition = null;
     let isUserWantsToListen = false;
     let isBrowserListening = false;
+    let isSpeechSuppressed = false; // Flag to prevent STT during AI speech
 
     function initSpeech() {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -513,9 +522,13 @@
       };
 
       recognition.onerror = (event) => {
+        if (event.error === 'aborted') {
+          console.log('[STT] Manual pause or AI speech abort.');
+          return;
+        }
         console.error('[STT Error]', event.error);
         if (event.error === 'not-allowed') {
-          alert('Microphone access denied. Please enable microphone permissions.');
+          alert('Microphone access denied.');
           isUserWantsToListen = false;
         }
       };
@@ -525,17 +538,15 @@
         document.getElementById('mic-btn')?.classList.remove('recording');
         console.log('[STT] Browser recording ended.');
 
-        if (isUserWantsToListen) {
+        if (isUserWantsToListen && !isSpeechSuppressed) {
           console.log('[STT] Auto-restarting...');
           try {
             recognition.start();
           } catch (e) {
             console.error('[STT] Auto-restart failed', e);
-            isUserWantsToListen = false;
           }
         } else {
-          const status = document.getElementById('footer-status');
-          if (status) status.textContent = 'Ready';
+          document.getElementById('footer-status').textContent = isSpeechSuppressed ? 'AI is speaking...' : 'Ready';
         }
       };
     }
@@ -548,6 +559,7 @@
 
       isUserWantsToListen = !isUserWantsToListen;
       if (isUserWantsToListen) {
+        isSpeechSuppressed = false;
         if (!isBrowserListening) {
           try {
             recognition.start();
