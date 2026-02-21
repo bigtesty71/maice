@@ -625,9 +625,16 @@
     // EMAIL COLLECTION
     // ═══════════════════════════
     async function submitEmail() {
-      const name = document.getElementById('collect-name').value;
-      const email = document.getElementById('collect-email').value;
-      const status = document.getElementById('collect-status');
+      // Find the active container (either the sidebar or the metrics overlay)
+      const overlay = document.getElementById('metrics-overlay');
+      const container = (overlay && overlay.classList.contains('active')) ? overlay : document.body;
+
+      const nameInput = container.querySelector('#collect-name');
+      const emailInput = container.querySelector('#collect-email');
+      const status = container.querySelector('#collect-status');
+
+      const name = nameInput ? nameInput.value : '';
+      const email = emailInput ? emailInput.value : '';
 
       if (!email || !email.includes('@')) {
         status.textContent = 'Please provide a valid email.';
@@ -641,7 +648,7 @@
       status.style.display = 'block';
 
       try {
-        const res = await fetch('https://script.google.com/macros/s/AKfycbxtzF0SoQZscZm1GFQ8yqNJgUTM9u-qWPmjC9cT1-Kq_qbcVofKuquYsGsI7nJ5CWg/exec', {
+        await fetch('https://script.google.com/macros/s/AKfycbxtzF0SoQZscZm1GFQ8yqNJgUTM9u-qWPmjC9cT1-Kq_qbcVofKuquYsGsI7nJ5CWg/exec', {
           method: 'POST',
           mode: 'no-cors',
           headers: { 'Content-Type': 'application/json' },
@@ -650,8 +657,8 @@
 
         status.textContent = 'Neural link established! (Sheet Synced)';
         status.style.color = 'var(--neon-green)';
-        document.getElementById('collect-name').value = '';
-        document.getElementById('collect-email').value = '';
+        if (nameInput) nameInput.value = '';
+        if (emailInput) emailInput.value = '';
 
       } catch (err) {
         status.textContent = 'Connection failed.';
@@ -670,10 +677,21 @@
         // Refresh metrics content immediately
         const metrics = document.querySelector('.sidebar .metric-card').cloneNode(true);
         const gauge = document.querySelector('.sidebar .context-gauge').cloneNode(true);
+
+        // Find the email collect card
+        const emailCard = document.querySelector('.email-collect-card').parentElement.cloneNode(true);
+
         const content = document.getElementById('metrics-content');
         content.innerHTML = '';
         content.appendChild(metrics);
         content.appendChild(gauge);
+        content.appendChild(emailCard);
+
+        // Re-wire the button in the clone
+        const cloneBtn = content.querySelector('button');
+        if (cloneBtn) {
+          cloneBtn.onclick = submitEmail;
+        }
       }
     }
 
