@@ -149,7 +149,14 @@
   <script>
     const API = '';
     let isProcessing = false;
+    let pendingImage = null;
 
+    // Detect Widget Mode
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('widget') || window.self !== window.top) {
+      document.body.classList.add('is-widget');
+      console.log('[MAGGIE] Widget mode active.');
+    }
     // ═══════════════════════════
     // STATUS POLLING
     // ═══════════════════════════
@@ -231,8 +238,6 @@
     // ═══════════════════════════
     // SEND MESSAGE
     // ═══════════════════════════
-    let pendingImage = null;
-
     function handleImageSelect(event) {
       const file = event.target.files[0];
       if (!file) return;
@@ -316,13 +321,14 @@
       input.focus();
 
       // If continuous speech was active, restart it to clear the session buffer
-      // (Otherwise previous text keeps re-appearing)
-      if (isRecording && recognition) {
+      if (isUserWantsToListen && recognition) {
         recognition.abort(); // Stop listening
         setTimeout(() => {
           try {
-            recognition.start(); // Restart fresh
-            document.getElementById('footer-status').textContent = 'Listening... (Click mic to stop)';
+            if (isUserWantsToListen) {
+              recognition.start(); // Restart fresh
+              document.getElementById('footer-status').textContent = 'Listening... (Click mic to stop)';
+            }
           } catch (e) { console.error('Restart speech failed', e); }
         }, 300);
       }
@@ -339,8 +345,8 @@
       container.appendChild(div);
       container.scrollTop = container.scrollHeight;
 
-      // TTS: Speak if it's AI and not muted
-      if (role === 'ai' && isTTSActive) {
+      // TTS: Speak if it's AI, not muted, and not an error/system note
+      if (role === 'ai' && isTTSActive && !text.includes('⚠ Connection error')) {
         speakText(text);
       }
     }

@@ -27,11 +27,21 @@ class MemoryKeepEngine {
     this.config = JSON.parse(fs.readFileSync(cfgFile, 'utf-8'));
 
     // --- Google GenAI Client ---
-    this.apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
-    if (!this.apiKey || this.apiKey === 'YOUR_GOOGLE_AI_API_KEY_HERE') {
+    const googleKey = process.env.GOOGLE_API_KEY;
+    const geminiKey = process.env.GEMINI_API_KEY;
+
+    // Choose the key, ensuring we don't use the placeholder
+    this.apiKey = googleKey;
+    if (!this.apiKey || this.apiKey.includes('YOUR_GOOGLE_AI_API_KEY_HERE')) {
+      this.apiKey = geminiKey;
+    }
+
+    if (!this.apiKey || this.apiKey.includes('YOUR_GOOGLE_AI_API_KEY_HERE')) {
       console.warn('[MAGGIE] WARNING: No valid Google/Gemini API key found in .env.');
     }
-    this.genAI = new GoogleGenerativeAI(this.apiKey);
+
+    // Use v1beta for Gemma 3 compatibility as per documentation
+    this.genAI = new GoogleGenerativeAI(this.apiKey, { apiVersion: 'v1beta' });
 
     // --- Database ---
     this.isVercel = process.env.VERCEL === '1';
@@ -288,10 +298,13 @@ class MemoryKeepEngine {
 
         return text;
       } catch (err) {
-        console.error(`[LLM Error] ${purpose}: ${err.message}`);
-        return `Error connecting to Gemma: ${err.message}`;
-      } finally {
+        process.stdout.write(`\n❌ [LLM Error: ${purpose}] ${err.message}\n`);
+        if (err.stack) console.error(err.stack);
         this.llmBusy = false;
+
+        // Return empty or error message if inference
+        if (purpose === 'inference') return `[System Error] I'm having trouble connecting to my neural core right now. (Ref: ${err.message.slice(0, 50)})`;
+        return '';
       }
     };
 

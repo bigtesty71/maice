@@ -122,11 +122,16 @@
 
     const persona = document.createElement('div');
     persona.id = 'maice-widget-persona';
-    persona.innerHTML = `<img src="${WIDGET_URL}/images/MAGGIE.png" alt="MAGGIE" style="object-position: top center;">`;
+    // Use WIDGET_MAGGIE.png for the rectangular side image, fallback to MAGGIE.png
+    persona.innerHTML = `
+        <img src="${WIDGET_URL}/images/WIDGET_MAGGIE.png" 
+             onerror="this.src='${WIDGET_URL}/images/MAGGIE.png'" 
+             alt="MAGGIE" 
+             style="object-position: top center;">`;
 
     const frame = document.createElement('iframe');
     frame.id = 'maice-widget-frame';
-    frame.src = WIDGET_URL;
+    frame.src = WIDGET_URL + '?widget=true';
     frame.style.flex = "1";
     frame.allow = "microphone; camera; clipboard-write";
 
