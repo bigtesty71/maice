@@ -1,10 +1,10 @@
 (function () {
     //  MAGGIE Widget Injection Script
-    // Usage: <script src="https://maggie.companain.life/widget.js"></script>
+    // Usage: <script src="https://companain.life/widget.js"></script>
 
     const WIDGET_URL = window.location.origin === 'http://localhost:3000' || window.location.origin === 'http://localhost:8000'
         ? window.location.origin
-        : (window.location.origin.includes('vercel.app') ? window.location.origin : 'https://maggie.companain.life/home');
+        : (window.location.origin.includes('vercel.app') ? window.location.origin : 'https://maice-eosin.vercel.app');
 
     // 1. Create Styles
     const style = document.createElement('style');
