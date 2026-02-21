@@ -867,3 +867,55 @@ body.is-widget .send-btn {
     padding: 8px 16px;
     font-size: 0.8rem;
 }
+/* Metrics Overlay */
+.metrics-overlay {
+    position: fixed;
+    top: 60px;
+    right: 20px;
+    width: 300px;
+    background: var(--surface);
+    backdrop-filter: blur(20px);
+    border: 1px solid var(--accent);
+    border-radius: 16px;
+    padding: 20px;
+    z-index: 2000;
+    display: none;
+    flex-direction: column;
+    gap: 15px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+    animation: slideIn 0.3s ease-out;
+}
+
+.metrics-overlay.active {
+    display: flex;
+}
+
+.metrics-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.7rem;
+    letter-spacing: 2px;
+    color: var(--text-dim);
+}
+
+.metrics-header button {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 1.2rem;
+    cursor: pointer;
+}
+
+#metrics-btn {
+    display: none;
+}
+
+body.is-widget #metrics-btn {
+    display: block;
+}
+
+@keyframes slideIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
