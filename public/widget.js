@@ -112,6 +112,8 @@
 
     const launcher = document.createElement('div');
     launcher.id = 'maice-widget-launcher';
+    // Premium MAGGIE Launcher
+    launcher.style.background = 'linear-gradient(135deg, #0097b2, #9f7aea)';
     launcher.innerHTML = '✨';
     launcher.onclick = toggleWidget;
 
@@ -122,10 +124,9 @@
 
     const persona = document.createElement('div');
     persona.id = 'maice-widget-persona';
-    // Use Macie2.png for the rectangular side image
+    // Use MAGGIE.png for the persona side image
     persona.innerHTML = `
-        <img src="${WIDGET_URL}/images/Macie2.png" 
-             onerror="this.src='${WIDGET_URL}/images/MAGGIE.png'" 
+        <img src="${WIDGET_URL}/images/MAGGIE.png" 
              alt="MAGGIE" 
              style="object-position: top center;">`;
 
