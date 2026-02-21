@@ -867,6 +867,7 @@ body.is-widget .send-btn {
     padding: 8px 16px;
     font-size: 0.8rem;
 }
+
 /* Metrics Overlay */
 .metrics-overlay {
     position: fixed;
@@ -882,7 +883,7 @@ body.is-widget .send-btn {
     display: none;
     flex-direction: column;
     gap: 15px;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
     animation: slideIn 0.3s ease-out;
 }
 
@@ -916,6 +917,44 @@ body.is-widget #metrics-btn {
 }
 
 @keyframes slideIn {
-    from { opacity: 0; transform: translateY(-10px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Keep in Touch Widget */
+.email-collect-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--glass-border);
+    padding: 16px;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.email-collect-card input {
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--glass-border);
+    border-radius: 6px;
+    padding: 10px;
+    color: var(--text);
+    font-size: 0.85rem;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.3s;
+}
+
+.email-collect-card input:focus {
+    border-color: var(--accent);
+}
+
+.email-collect-card input::placeholder {
+    color: #555;
 }
