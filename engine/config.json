@@ -2,7 +2,7 @@
     "model_name": "models/gemma-3-27b-it",
     "sifter_model_name": "models/gemma-3-4b-it",
     "vision_model_name": "models/gemma-3-27b-it",
-    "app_context_cap": 128000,
+    "app_context_cap": 32000,
     "rolling_overlap": 5,
     "heartbeat_minutes": 30,
     "disable_telegram": true,

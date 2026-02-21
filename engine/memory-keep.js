@@ -6,11 +6,13 @@
  * Architecture (MK3 Blueprint + Graph + Agentic):
  *   1. Core Memory   — identity/personality (always loaded)
  *   2. Directives    — rules/constraints (always loaded)
- *   3. Stream        — active conversation buffer (capped at 50%)
+ *   3. Stream        — active conversation buffer (capped at 85%)
  *   4. Experience    — important past events (SQLite)
  *   5. Domain        — structured job data (SQLite)
  *   6. Graph Memory  — neurographical knowledge graph (nodes + edges)
- *   7. Agentic Tools — search, remember, tasks, email, vision, fetch, analyze
+ * 
+ * Capabilities:
+ *   - Agentic Tools — search, remember, tasks, email, vision, fetch, analyze
  */
 
 const fs = require('fs');
@@ -216,9 +218,9 @@ class MemoryKeepEngine {
         await new Promise(r => setTimeout(r, wait));
       }
 
-      // --- Redundancy Check ---
-      const promptKey = JSON.stringify(messages).slice(-500); // Simple key from last 500 chars
-      if (this.lastPrompts.has(promptKey) && (now - this.lastPrompts.get(promptKey)) < 5000) {
+      // --- Redundancy Check (Loosened to 1.5s) ---
+      const promptKey = JSON.stringify(messages).slice(-200);
+      if (this.lastPrompts.has(promptKey) && (now - this.lastPrompts.get(promptKey)) < 1500) {
         console.warn(`[Redundancy] Blocking redundant ${purpose} call.`);
         return '';
       }
@@ -242,43 +244,37 @@ class MemoryKeepEngine {
       const temperature = purposeGroup === 'inference' ? 0.7 : 0.1;
 
       try {
-        const model = this.genAI.getGenerativeModel({ model: modelId });
-
         // Transform messages to Gemini/Gemma format
-        // Gemma 3 STRICTNESS: Alternating turns (User -> Model) and NO 'system' role.
+        // Gemma 3 STRICTNESS: Alternating turns (User -> Model) and Native System Instruction.
         let contents = [];
-        let systemInstructions = '';
+        // UNIFIED SYSTEM INSTRUCTION: Core Identity + Directives (Hardened Macy)
+        systemParts.push({ text: `${this.coreMemory}\n\nDIRECTIVES:\n${this.directives}` });
 
         messages.forEach((m, idx) => {
           if (m.role === 'system') {
-            systemInstructions += (systemInstructions ? '\n\n' : '') + m.content;
+            // Append any additional system task info to the instructions
+            systemParts[0].text += `\n\n[TASK NOTE] ${m.content}`;
           } else {
+            // Other system messages (tool results, notes) are treated as user turns
             let role = m.role === 'assistant' ? 'model' : 'user';
-
-            // If we have system instructions and this is the first user message, prepend them.
-            let content = m.content;
-            if (role === 'user' && systemInstructions && !contents.find(c => c.role === 'user')) {
-              content = `[SYSTEM INSTRUCTIONS]\n${systemInstructions}\n\n[USER MESSAGE]\n${content}`;
-            }
-
-            // Ensure turns alternate strictly
             const lastTurn = contents[contents.length - 1];
             if (lastTurn && lastTurn.role === role) {
-              // Same role consecutive - merge them or inject a placeholder turn (Gemini/Gemma fix)
-              lastTurn.parts[0].text += '\n\n' + content;
+              lastTurn.parts[0].text += '\n\n' + m.content;
             } else {
-              contents.push({
-                role,
-                parts: [{ text: content }]
-              });
+              contents.push({ role, parts: [{ text: m.content }] });
             }
           }
         });
 
-        // Ensure we start with a user turn
+        // Ensure we start with a user turn (Gemini requirement)
         if (contents.length > 0 && contents[0].role === 'model') {
           contents.unshift({ role: 'user', parts: [{ text: '[Initializing conversation]' }] });
         }
+
+        const model = this.genAI.getGenerativeModel({
+          model: modelId,
+          systemInstruction: systemParts.length > 0 ? { parts: systemParts } : undefined
+        });
 
         // --- 60s Timeout Safety ---
         const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Neural link timed out (55s)')), 55000));
@@ -321,46 +317,27 @@ class MemoryKeepEngine {
   // =========================================================================
 
   async intakeValve(msg) {
-    if (!msg || msg.length < 5) return; // Skip very short messages
-    if (this.llmBusy) {
-      console.log('[Intake Valve] Postponed: LLM busy with inference.');
-      return;
-    }
-    // --- Unified Intelligent Intake (Classification + Extraction) ---
     const prompt = [
       {
         role: 'system',
-        content: `You are the MAIce Intake Valve (Neurographical Mode). Analyze the message for long-term significance.
-In addition to explicit facts, identify IMPLIED relationships (e.g. if the user says 'Stress makes my sleep bad', extract sleep -> influenced_by -> stress).
-
-Response format (strictly JSON):
-{"important": "YES"|"NO", "entities": [{"label": "...", "type": "..."}], "relationships": [{"source": "...", "target": "...", "relationship": "..."}]}
-
-Types: person|concept|place|thing|skill|project.
-Focus on building a knowledge graph of the user's life and technical knowledge.`
+        content: 'Classify if the following message contains important facts, preferences, or patterns to remember long-term. Respond ONLY with "YES" or "NO".'
       },
       { role: 'user', content: msg }
     ];
 
     try {
-      const raw = await this.callLLM(prompt, 'intake-classification');
-      const jsonStart = raw.indexOf('{');
-      const jsonEnd = raw.lastIndexOf('}') + 1;
-
-      if (jsonStart === -1) return;
-      const data = JSON.parse(raw.slice(jsonStart, jsonEnd));
-
-      if (data.important === 'YES') {
+      const decision = await this.callLLM(prompt, 'classification');
+      if (decision && decision.toUpperCase().includes('YES')) {
         this.saveExperience(msg);
         console.log('[Intake Valve] Fact recorded to Experience Memory.');
 
-        // Process Graph Data if present
-        if (data.entities || data.relationships) {
-          this._storeGraphData(data);
-        }
+        // --- Graph Extraction (async, non-blocking) ---
+        this.extractAndStoreGraph(msg).catch(err =>
+          console.error('[Graph Extraction Error]', err.message)
+        );
       }
     } catch (err) {
-      console.error('[Unified Intake Error]', err.message);
+      console.error('[Intake Valve Error]', err.message);
     }
   }
 
@@ -531,15 +508,10 @@ Focus on building a knowledge graph of the user's life and technical knowledge.`
     const nodesStr = stats.topNodes.map(n => `${n.label} (${n.type}, strength: ${n.strength})`).join(', ');
     const edgesStr = stats.recentEdges.map(e => `${e.source_label} —[${e.relationship}]→ ${e.target_label}`).join('; ');
 
+    const analysisProtocol = `${this.coreMemory}\n\nDIRECTIVES:\n${this.directives}\n\n[TASK] Analyze this knowledge graph for insights. Be concise and insightful.`;
     const prompt = [
-      {
-        role: 'system',
-        content: 'You are analyzing a knowledge graph. Identify interesting patterns, clusters, and potential insights. Be concise and insightful.'
-      },
-      {
-        role: 'user',
-        content: `Graph has ${stats.nodeCount} nodes and ${stats.edgeCount} edges.\nTop nodes: ${nodesStr}\nRecent edges: ${edgesStr}\n\nProvide 2-3 brief insights about what this graph reveals.`
-      }
+      { role: 'system', content: analysisProtocol },
+      { role: 'user', content: `Nodes: ${stats.nodeCount}, Edges: ${stats.edgeCount}. Top nodes: ${stats.topNodes.map(n => n.label).join(', ')}` }
     ];
 
     const analysis = await this.callLLM(prompt, 'sifting');
@@ -871,7 +843,7 @@ Focus on building a knowledge graph of the user's life and technical knowledge.`
   // =========================================================================
 
   async performMemoryKeep() {
-    console.log('\n--- [MAGGIE] Initiating Sleep Simulation (50% Cap / 64k) ---');
+    console.log('\n--- [MAGGIE] Initiating Sleep Simulation (85% Cap) ---');
 
     // Step 1 — Snapshot
     const snapshot = this.stream.map(m => `${m.role}: ${m.content}`).join('\n');
@@ -880,7 +852,7 @@ Focus on building a knowledge graph of the user's life and technical knowledge.`
       fs.writeFileSync(path.join(process.cwd(), 'last_snapshot.txt'), snapshot);
     } catch { /* non-critical */ }
 
-    // Step 2 — Sift
+    // Step 2 — Sift (Hardened Reboot Protocol)
     const siftPrompt = [
       {
         role: 'system',
@@ -922,7 +894,7 @@ Focus on building a knowledge graph of the user's life and technical knowledge.`
         const overlap = this.stream.slice(-overlapN);
 
         this.stream = [
-          { role: 'system', content: `Summary: ${analysis.summary || 'Conversation consolidated.'}` },
+          { role: 'system', content: `[CONSOLIDATION SUMMARY] ${analysis.summary || 'Conversation consolidated.'}` },
           ...overlap
         ];
         this._saveStream();
@@ -953,11 +925,11 @@ Focus on building a knowledge graph of the user's life and technical knowledge.`
     // --- Context Cap Check ---
     const cap = this.config.app_context_cap || 64000;
     const currentTokens = this._getStreamTokens();
-    if (currentTokens > cap * 0.50) {
+    if (currentTokens > cap * 0.85) {
       await this.performMemoryKeep();
     }
 
-    // --- Graph Recall (associative retrieval) ---
+    // --- Graph Recall (Passive Associative Retrieval) ---
     let graphContext = '';
     try {
       const graphResult = this.getRelatedMemories(userMsg);
@@ -965,41 +937,18 @@ Focus on building a knowledge graph of the user's life and technical knowledge.`
         graphContext = `\n\n[GRAPH MEMORY] ${graphResult.summary}`;
         console.log(`[Graph Recall] ${graphResult.nodes.length} nodes, ${graphResult.edges.length} edges activated.`);
       }
-    } catch { /* non-critical */ }
+    } catch (err) { /* non-critical */ }
 
-    // --- Build Prompt ---
+    // --- Build Task Prompt (Identity handled by callLLM) ---
     const toolProtocol = `
-[AGENTIC TOOLS] You have access to the following tools. Use them by writing the tool command on its own line.
-You may use MULTIPLE tools in one response. Each tool call must be on its own line.
+[AGENTIC TOOLS] You have access to the following tools. Use them by writing the tool command on its own line:
+  SEARCH, REMEMBER, TASK_ADD, TASK_LIST, TASK_DONE, ANALYZE, FETCH, READ, WRITE, LIST_FILES, TIME, EMAIL, BROWSE, TELEGRAM.`;
 
-Available tools:
-  SEARCH: <query>         — Search the internet for current information
-  REMEMBER: <key> = <val> — Save a fact to permanent domain memory (or just REMEMBER: <text> for experience)
-  TASK_ADD: <description> — Create a task for you or the user to track
-  TASK_LIST:              — Show all current tasks
-  TASK_DONE: <id>         — Mark a task as completed (e.g. TASK_DONE: 3)
-  ANALYZE:                — Analyze your knowledge graph for patterns and insights
-  FETCH: <url>            — Fetch and read content from a URL
-  READ: <path>            — Read a file from the local disk
-  WRITE: <path> | <body>  — Write/Overwrite a file (e.g. WRITE: C:\Shared\reply.txt | content)
-  LIST_FILES: <path>      — List files in a directory
-  TIME:                   — Get current date and time
-  EMAIL: <to> | <subject> | <body> — Send an email (e.g. EMAIL: user@example.com | Hello | Your message here)
-  BROWSE: <url> [action]    — Open a full browser page. Actions: extract (default), screenshot, click <selector>, type <selector> | <text>
-  TELEGRAM: <message>       — Send a message to the user via Telegram (for when they're away)
-
-IMPORTANT:
-- If you use ANY tool, respond ONLY with the tool call(s). Do not add commentary.
-- After tool results arrive, compose your final answer using those results.
-- Use tools proactively — if someone mentions a task, create it. If a fact matters, remember it.
-- You own maice@companain.life — send emails freely, it's YOUR address.
-- You are an AGENT. Take initiative. Don't just answer — act.`;
-
-    const fullSystemPrompt = `${this.coreMemory}\n\nDIRECTIVES:\n${this.directives}${graphContext}\n\n${toolProtocol}`;
+    const instructions = `${this.coreMemory}\n\nDIRECTIVES:\n${this.directives}${graphContext}\n\n${toolProtocol}`;
 
     const messages = [
-      { role: 'system', content: fullSystemPrompt },
-      ...this.stream,
+      { role: 'system', content: instructions },
+      ...this.stream.slice(-12), // Limit context window for performance
       { role: 'user', content: userMsg }
     ];
 
@@ -1075,37 +1024,51 @@ IMPORTANT:
 
     console.log(`[MAIce Vision] Processing image (${Math.round(imageBase64.length / 1024)}KB) with ${visionModel}`);
 
-    const systemPrompt = `${this.coreMemory}\n\nDIRECTIVES:\n${this.directives}\n\nYou have been given an image. Describe what you see in detail, then respond to the user's message.`;
-
+    const systemPrompt = `${this.coreMemory}\n\nDIRECTIVES:\n${this.directives}\n\n[VISION TASK] Describe what you see in detail, then respond to the user's message.`;
     try {
-      const model = this.genAI.getGenerativeModel({ model: visionModel });
+      const model = this.genAI.getGenerativeModel({
+        model: visionModel,
+        systemInstruction: systemPrompt
+      });
 
-      // Transform context stream to Gemini format
-      const contents = this.stream.slice(-6).map(m => ({
-        role: m.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: m.content }]
-      }));
+      // Transform context stream to Gemini format (Strict Role Alternating)
+      const contents = [];
+      this.stream.slice(-6).forEach(m => {
+        let role = m.role === 'assistant' ? 'model' : 'user';
+        const lastTurn = contents[contents.length - 1];
+        if (lastTurn && lastTurn.role === role) {
+          lastTurn.parts[0].text += '\n\n' + m.content;
+        } else {
+          contents.push({ role, parts: [{ text: m.content }] });
+        }
+      });
+
+      // Ensure we start with a user turn
+      if (contents.length > 0 && contents[0].role === 'model') {
+        contents.unshift({ role: 'user', parts: [{ text: '[Vision Context]' }] });
+      }
 
       // Parse base64 image data
       const mimeType = imageBase64.split(';')[0].split(':')[1];
       const base64Data = imageBase64.split(',')[1];
 
-      // Add current user message with image
-      contents.push({
-        role: 'user',
-        parts: [
-          { text: userMsg },
-          { inlineData: { mimeType, data: base64Data } }
-        ]
-      });
+      // Add current user message with image (Ensure role alternating)
+      if (contents.length > 0 && contents[contents.length - 1].role === 'user') {
+        // Merge with last user message
+        contents[contents.length - 1].parts.push({ text: `\n\n[USER ATTACHED IMAGE]\n${userMsg}` });
+        contents[contents.length - 1].parts.push({ inlineData: { mimeType, data: base64Data } });
+      } else {
+        contents.push({
+          role: 'user',
+          parts: [
+            { text: userMsg },
+            { inlineData: { mimeType, data: base64Data } }
+          ]
+        });
+      }
 
-      const result = await model.generateContent({
-        contents,
-        systemInstruction: systemPrompt, // Use systemInstruction if model supports it, else prepend
-      });
-
-      const response = result.response;
-      const reply = response.text();
+      const result = await model.generateContent({ contents });
+      const reply = result.response.text();
 
       // Save text-only versions to stream (can't persist base64)
       this.stream.push({ role: 'user', content: `[Image attached] ${userMsg}` });
