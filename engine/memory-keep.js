@@ -281,7 +281,7 @@ class MemoryKeepEngine {
         }
 
         // --- 60s Timeout Safety ---
-        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Neural link timed out (60s)')), 60000));
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Neural link timed out (55s)')), 55000));
 
         const result = await Promise.race([
           model.generateContent({
