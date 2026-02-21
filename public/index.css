@@ -468,7 +468,12 @@ body {
     .message.ai::before {
         width: 32px;
         height: 32px;
-        top: -16px;
+        top: 0;
+        left: -40px;
+    }
+
+    .message.ai {
+        margin-left: 40px;
     }
 
     .header {
@@ -594,12 +599,13 @@ body {
 .message.ai {
     align-self: flex-start;
     background: var(--surface);
-    border: 1px solid rgba(159, 122, 234, 0.15);
+    border: 1px solid rgba(0, 151, 178, 0.2);
+    /* Changed from purple to cyan */
     color: var(--text);
     border-bottom-left-radius: 4px;
     margin-top: 5px;
-    margin-left: 55px;
-    /* Space for avatar on left */
+    margin-left: 60px;
+    /* Increased space for avatar */
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
 }
 
@@ -607,12 +613,13 @@ body {
     content: '';
     position: absolute;
     top: 0;
-    left: -55px;
-    /* Positioned to the left of the bubble */
+    left: -60px;
+    /* Adjusted to match bubble margin */
     width: 44px;
     height: 44px;
     border-radius: 50%;
     background-image: url('images/MAGGIE.png');
+    /* Forced MAGGIE image */
     background-size: cover;
     background-position: center;
     border: 2px solid var(--accent);
