@@ -641,20 +641,17 @@
       status.style.display = 'block';
 
       try {
-        // This will be replaced by the actual GAS URL once provided by the user
-        // For now, we'll log it and show a success message as a placeholder
-        console.log('[MAGGIE] Email collection triggered:', { name, email });
+        const res = await fetch('https://script.google.com/macros/s/AKfycbxtzF0SoQZscZm1GFQ8yqNJgUTM9u-qWPmjC9cT1-Kq_qbcVofKuquYsGsI7nJ5CWg/exec', {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email })
+        });
 
-        // PLACEHOLDER: Since we don't have the Web App URL yet, we simulate success
-        // In a real implementation, this would be:
-        // const res = await fetch('YOUR_GAS_URL', { method: 'POST', body: JSON.stringify({ name, email }) });
-
-        setTimeout(() => {
-          status.textContent = 'Neural link established! (Sheet Synced)';
-          status.style.color = 'var(--neon-green)';
-          document.getElementById('collect-name').value = '';
-          document.getElementById('collect-email').value = '';
-        }, 1000);
+        status.textContent = 'Neural link established! (Sheet Synced)';
+        status.style.color = 'var(--neon-green)';
+        document.getElementById('collect-name').value = '';
+        document.getElementById('collect-email').value = '';
 
       } catch (err) {
         status.textContent = 'Connection failed.';
