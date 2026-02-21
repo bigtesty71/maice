@@ -5,6 +5,6 @@
     "app_context_cap": 32000,
     "rolling_overlap": 5,
     "heartbeat_minutes": 30,
-    "disable_telegram": true,
+    "disable_telegram": false,
     "disable_vision": false
 }

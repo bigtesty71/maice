@@ -618,10 +618,10 @@ body {
     width: 44px;
     height: 44px;
     border-radius: 50%;
-    background-image: url('images/MAGGIE.png');
+    background-image: url('images/4.png');
     /* Forced MAGGIE image */
     background-size: cover;
-    background-position: center;
+    background-position: top center;
     border: 2px solid var(--accent);
     box-shadow: 0 0 10px var(--accent-glow);
 }
