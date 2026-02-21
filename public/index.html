@@ -150,6 +150,7 @@
     const API = '';
     let isProcessing = false;
     let pendingImage = null;
+    let isPuterReady = false; // Flag for high-quality TTS readiness
 
     // Detect Widget Mode
     const urlParams = new URLSearchParams(window.location.search);
@@ -450,22 +451,22 @@
       clean = clean.replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1");
       clean = clean.replace(/[\*\_]{1,3}([^\*\_]+)[\*\_]{1,3}/g, "$1");
 
-      if (window.puter && window.puter.ai) {
+      if (window.puter && window.puter.ai && isPuterReady) {
         try {
           if (currentAudio) {
             currentAudio.pause();
           }
 
           console.log('[Puter TTS] Synthesizing high-quality voice (Joanna/Neural)...');
-          // 💡 USER: Change 'Joanna' to 'Matthew', 'Salli', or 'Joey' to switch voices
           currentAudio = await puter.ai.txt2speech(clean, {
-            voice: 'Joanna', // Standard Puter Joanna voice
+            voice: 'Joanna',
             engine: 'neural'
           });
           currentAudio.play();
           return;
         } catch (err) {
           console.error('[Puter TTS Error]', err);
+          // Don't disable isPuterReady on one error, but maybe fallback
         }
       }
 
@@ -602,10 +603,13 @@
               console.log('[Puter] User is signed in.');
               document.getElementById('puter-badge').textContent = 'PUTER ACTIVE';
               document.getElementById('puter-badge').style.color = 'var(--neon-cyan)';
+              isPuterReady = true;
             } else {
               console.log('[Puter] User not signed in.');
               document.getElementById('puter-badge').textContent = 'PUTER (GUEST)';
               document.getElementById('puter-badge').style.color = '#ffcc00';
+              // If not signed in, we can try to prompt interaction later, 
+              // but we don't set isPuterReady yet to avoid hanging on pop-ups.
             }
           } catch (e) {
             console.warn('[Puter] Auth check failed', e);
