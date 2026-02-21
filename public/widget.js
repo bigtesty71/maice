@@ -38,7 +38,8 @@
             display: none;
             border-right: 1px solid rgba(255,255,255,0.1);
             flex-shrink: 0;
-            order: 1; /* Move to the left */
+            order: 1; 
+            position: relative;
         }
         #MAGGIE-widget-container.expanded #MAGGIE-widget-persona {
             display: block;
@@ -48,6 +49,41 @@
             height: 100%;
             object-fit: cover;
             object-position: top center;
+            opacity: 0.7;
+        }
+        .maggie-form-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(to top, #291b25, transparent);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            box-sizing: border-box;
+        }
+        .maggie-form-overlay input {
+            width: 100%;
+            padding: 8px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 6px;
+            color: white;
+            font-size: 0.8rem;
+            outline: none;
+            box-sizing: border-box;
+        }
+        .maggie-form-overlay button {
+            width: 100%;
+            padding: 8px;
+            background: #0097b2;
+            border: none;
+            border-radius: 6px;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 0.8rem;
         }
         #MAGGIE-widget-launcher {
             width: 60px;
@@ -73,7 +109,7 @@
             display: none;
             background: #291b25;
             flex: 1;
-            order: 2; /* Move to the right */
+            order: 2;
         }
         #MAGGIE-widget-container.expanded #MAGGIE-widget-launcher {
             display: none;
@@ -138,7 +174,15 @@
 
     const persona = document.createElement('div');
     persona.id = 'MAGGIE-widget-persona';
-    persona.innerHTML = `<img src="${WIDGET_URL}/images/MAGGIE.png" alt="MAGGIE">`;
+    persona.innerHTML = `
+        <img src="${WIDGET_URL}/images/MAGGIE.png" alt="MAGGIE">
+        <div class="maggie-form-overlay">
+            <input type="text" id="maggie-name" placeholder="Name">
+            <input type="email" id="maggie-email" placeholder="Email">
+            <button id="maggie-connect-btn">Connect</button>
+            <div id="maggie-status" style="color: #b5e48c; font-size: 0.65rem; display:none;">Link established!</div>
+        </div>
+    `;
 
     const frame = document.createElement('iframe');
     frame.id = 'MAGGIE-widget-frame';
@@ -152,7 +196,32 @@
     container.appendChild(frame);
     document.body.appendChild(container);
 
+    // 3. Form Logic
+    const connectBtn = container.querySelector('#maggie-connect-btn');
+    connectBtn.onclick = async () => {
+        const name = container.querySelector('#maggie-name').value;
+        const email = container.querySelector('#maggie-email').value;
+        const status = container.querySelector('#maggie-status');
+
+        if (!email) return;
+
+        try {
+            await fetch('https://script.google.com/macros/s/AKfycbxtzF0SoQZscZm1GFQ8yqNJgUTM9u-qWPmjC9cT1-Kq_qbcVofKuquYsGsI7nJ5CWg/exec', {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, email })
+            });
+            status.style.display = 'block';
+            container.querySelector('#maggie-name').value = '';
+            container.querySelector('#maggie-email').value = '';
+        } catch (e) {
+            console.error('Connection failed', e);
+        }
+    };
+
     function toggleWidget() {
         container.classList.toggle('expanded');
     }
 })();
+
