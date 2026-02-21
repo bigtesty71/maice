@@ -1,6 +1,6 @@
 (function () {
     //  MAGGIE Widget Injection Script
-    // Usage: <script src="https://companain.life/widget.js"></script>
+    // Usage: <script src="https://maice-eosin.vercel.app/widget.js"></script>
 
     const WIDGET_URL = window.location.origin === 'http://localhost:3000' || window.location.origin === 'http://localhost:8000'
         ? window.location.origin
