@@ -132,7 +132,9 @@
 
     const frame = document.createElement('iframe');
     frame.id = 'maice-widget-frame';
-    frame.src = WIDGET_URL + '?widget=true';
+    // Append timestamp for cache busting
+    const timestamp = new Date().getTime();
+    frame.src = WIDGET_URL + '?widget=true&v=' + timestamp;
     frame.style.flex = "1";
     frame.allow = "microphone; camera; clipboard-write";
 
