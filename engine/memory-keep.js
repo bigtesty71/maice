@@ -42,21 +42,16 @@ class MemoryKeepEngine {
       console.warn('[MAGGIE] WARNING: No valid Google/Gemini API key found in .env.');
     }
 
-    // Use v1beta for Gemma 3 compatibility as per documentation
-    this.genAI = new GoogleGenerativeAI(this.apiKey, { apiVersion: 'v1beta' });
+    // Gemma 3 via Gemini API — single arg constructor
+    this.genAI = new GoogleGenerativeAI(this.apiKey);
 
     // --- Database ---
     this.isVercel = process.env.VERCEL === '1';
-    if (this.isVercel) {
-      console.log('[MAIce] Vercel environment detected. Using /tmp for database.');
-      this.dbPath = '/tmp/memory_keep.db';
-      // If it doesn't exist in /tmp, we might want to copy an initial one if it exists in process.cwd()
-      // But for serverless, it usually starts fresh or we rely on external DB.
-      // better-sqlite3 will create it if it doesn't exist.
-    } else {
-      this.dbPath = dbPath || path.join(process.cwd(), 'memory_keep.db');
-    }
+    this.dbPath = this.isVercel ? '/tmp/memory_keep.db' : (dbPath || path.join(process.cwd(), 'memory_keep.db'));
     this.setupStorage();
+
+    // Force reload latest config to ensure parity with disk (32k context fix)
+    this.config = JSON.parse(fs.readFileSync(cfgFile, 'utf-8'));
 
     // --- Flat Files (always-loaded) ---
     this.coreMemory = this._loadFlat(path.join(engineDir, 'core_memory.txt'));
@@ -203,113 +198,159 @@ class MemoryKeepEngine {
   }
 
   // =========================================================================
-  // LLM CALLS (MISTRAL)
+  // LLM CALLS (GEMMA 3 via Gemini API)
   // =========================================================================
 
   async callLLM(messages, purpose = 'inference') {
-    // Chain onto the queue to ensure serialization
-    const task = async () => {
-      // --- Rate Limiting (Increased throttle to 2s) ---
-      const now = Date.now();
-      const timeSinceLast = now - (this.lastLLMCall || 0);
-      if (timeSinceLast < 2000) {
-        const wait = 2000 - timeSinceLast;
-        console.log(`[Rate Limit] Throttling ${purpose} for ${wait}ms...`);
-        await new Promise(r => setTimeout(r, wait));
-      }
+    // --- Rate Limiting ---
+    const now = Date.now();
+    const timeSinceLast = now - (this.lastLLMCall || 0);
+    if (timeSinceLast < 2000) {
+      const wait = 2000 - timeSinceLast;
+      console.log(`[Rate Limit] Throttling ${purpose} for ${wait}ms...`);
+      await new Promise(r => setTimeout(r, wait));
+    }
 
-      // --- Redundancy Check (Loosened to 1.5s) ---
-      const promptKey = JSON.stringify(messages).slice(-200);
-      if (this.lastPrompts.has(promptKey) && (now - this.lastPrompts.get(promptKey)) < 1500) {
-        console.warn(`[Redundancy] Blocking redundant ${purpose} call.`);
-        return '';
-      }
-      this.lastPrompts.set(promptKey, Date.now());
-      // Clean up old prompts
-      if (this.lastPrompts.size > 20) {
-        const firstKey = this.lastPrompts.keys().next().value;
-        this.lastPrompts.delete(firstKey);
-      }
+    // --- Redundancy Check ---
+    const promptKey = JSON.stringify(messages).slice(-200);
+    if (this.lastPrompts.has(promptKey) && (Date.now() - this.lastPrompts.get(promptKey)) < 1500) {
+      console.warn(`[Redundancy] Blocking redundant ${purpose} call.`);
+      return '';
+    }
+    this.lastPrompts.set(promptKey, Date.now());
+    if (this.lastPrompts.size > 20) {
+      const firstKey = this.lastPrompts.keys().next().value;
+      this.lastPrompts.delete(firstKey);
+    }
 
+    const purposeGroup = purpose.toLowerCase();
+
+    // Only one inference call at a time
+    if (purposeGroup === 'inference') {
+      let waitCount = 0;
+      while (this.llmBusy) {
+        await new Promise(r => setTimeout(r, 100));
+        waitCount++;
+        if (waitCount > 600) {
+          console.error('[LLM Lock] Forcing release after 60s wait.');
+          this.llmBusy = false;
+          break;
+        }
+      }
       this.llmBusy = true;
-      this.lastLLMCall = Date.now();
+    }
 
-      const purposeGroup = purpose.toLowerCase();
-      let modelId = this.config.model_name;
+    this.lastLLMCall = Date.now();
 
-      if (purposeGroup === 'sifting' || purposeGroup === 'classification' || purposeGroup === 'intake-classification') {
-        modelId = this.config.sifter_model_name;
+    // --- Model Selection ---
+    // Strip 'models/' prefix if present — Gemma 3 needs bare model names
+    let modelId = this.config.model_name;
+    if (purposeGroup === 'sifting' || purposeGroup === 'classification' || purposeGroup === 'intake-classification') {
+      modelId = this.config.sifter_model_name;
+    }
+    modelId = modelId.replace(/^models\//, '');
+
+    const temperature = purposeGroup === 'inference' ? 0.7 : 0.1;
+
+    try {
+      // ═══════════════════════════════════════════════════════════════
+      // GEMMA 3 CONTENT BUILDING
+      // Gemma 3 does NOT support systemInstruction parameter.
+      // System context is embedded into the first user turn instead.
+      // Strict user/model alternation is required.
+      // ═══════════════════════════════════════════════════════════════
+
+      // 1. Collect all system-role text into one block
+      let systemText = `${this.coreMemory}\n\nDIRECTIVES:\n${this.directives}`;
+      const conversationTurns = [];
+
+      for (const m of messages) {
+        if (m.role === 'system') {
+          systemText += `\n\n${m.content}`;
+        } else {
+          conversationTurns.push({
+            role: m.role === 'assistant' ? 'model' : 'user',
+            text: m.content
+          });
+        }
       }
 
-      const temperature = purposeGroup === 'inference' ? 0.7 : 0.1;
+      // 2. Build Gemini-compatible contents array
+      let contents = [];
 
-      try {
-        // Transform messages to Gemini/Gemma format
-        // Gemma 3 STRICTNESS: Alternating turns (User -> Model) and Native System Instruction.
-        let contents = [];
-        // UNIFIED SYSTEM INSTRUCTION: Core Identity + Directives (Hardened Macy)
-        systemParts.push({ text: `${this.coreMemory}\n\nDIRECTIVES:\n${this.directives}` });
+      // Inject system text as the opening of the first user turn
+      const systemPrefix = `[SYSTEM INSTRUCTIONS]\n${systemText}\n[END SYSTEM INSTRUCTIONS]\n\n`;
+      let systemInjected = false;
 
-        messages.forEach((m, idx) => {
-          if (m.role === 'system') {
-            // Append any additional system task info to the instructions
-            systemParts[0].text += `\n\n[TASK NOTE] ${m.content}`;
-          } else {
-            // Other system messages (tool results, notes) are treated as user turns
-            let role = m.role === 'assistant' ? 'model' : 'user';
-            const lastTurn = contents[contents.length - 1];
-            if (lastTurn && lastTurn.role === role) {
-              lastTurn.parts[0].text += '\n\n' + m.content;
-            } else {
-              contents.push({ role, parts: [{ text: m.content }] });
-            }
-          }
-        });
+      for (const turn of conversationTurns) {
+        let text = turn.text;
 
-        // Ensure we start with a user turn (Gemini requirement)
-        if (contents.length > 0 && contents[0].role === 'model') {
-          contents.unshift({ role: 'user', parts: [{ text: '[Initializing conversation]' }] });
+        // Prepend system text to the very first user turn
+        if (!systemInjected && turn.role === 'user') {
+          text = systemPrefix + text;
+          systemInjected = true;
         }
 
-        const model = this.genAI.getGenerativeModel({
-          model: modelId,
-          systemInstruction: systemParts.length > 0 ? { parts: systemParts } : undefined
-        });
-
-        // --- 60s Timeout Safety ---
-        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Neural link timed out (55s)')), 55000));
-
-        const result = await Promise.race([
-          model.generateContent({
-            contents,
-            generationConfig: { temperature, maxOutputTokens: 2048 },
-          }),
-          timeoutPromise
-        ]);
-
-        const text = result.response.text();
-
-        if (result.response.usageMetadata) {
-          console.log(`[Token Usage] ${purpose}: ${JSON.stringify(result.response.usageMetadata)}`);
+        const lastTurn = contents[contents.length - 1];
+        // Merge consecutive same-role turns (Gemma 3 strict alternation)
+        if (lastTurn && lastTurn.role === turn.role) {
+          lastTurn.parts[0].text += '\n\n' + text;
+        } else {
+          contents.push({ role: turn.role, parts: [{ text }] });
         }
-
-        return text;
-      } catch (err) {
-        process.stdout.write(`\n❌ [LLM Error: ${purpose}] ${err.message}\n`);
-        if (purpose === 'inference') return `[System Error] Neural core timeout or disconnect. (Ref: ${err.message.slice(0, 50)})`;
-        return '';
-      } finally {
-        this.llmBusy = false; // RELEASE LOCK
       }
-    };
 
-    // Add to queue and return result provided by the queue promise
-    const resultPromise = this.llmQueue.then(task);
+      // If system text wasn't injected yet (no user turns existed), create one
+      if (!systemInjected) {
+        contents.unshift({ role: 'user', parts: [{ text: systemPrefix + '[Awaiting input]' }] });
+      }
 
-    // Update queue pointer to wait for this task (catch errors so queue doesn't stall)
-    this.llmQueue = resultPromise.catch(() => { });
+      // Ensure first turn is user (Gemma 3 requirement)
+      if (contents[0].role === 'model') {
+        contents.unshift({ role: 'user', parts: [{ text: '[Conversation context]' }] });
+      }
 
-    return resultPromise;
+      // Ensure last turn is user (required for generation)
+      if (contents[contents.length - 1].role === 'model') {
+        contents.push({ role: 'user', parts: [{ text: '[Continue]' }] });
+      }
+
+      console.log(`[callLLM] ${purpose} | model: ${modelId} | turns: ${contents.length}`);
+
+      // 3. Call the API — NO systemInstruction (Gemma 3 doesn't support it)
+      const model = this.genAI.getGenerativeModel({ model: modelId });
+
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Neural link timed out (55s)')), 55000)
+      );
+
+      const result = await Promise.race([
+        model.generateContent({
+          contents,
+          generationConfig: { temperature, maxOutputTokens: 2048 },
+        }),
+        timeoutPromise
+      ]);
+
+      const text = result.response.text();
+
+      if (result.response.usageMetadata) {
+        console.log(`[Token Usage] ${purpose}: ${JSON.stringify(result.response.usageMetadata)}`);
+      }
+
+      console.log(`[callLLM] ${purpose} reply length: ${text.length}`);
+      return text;
+    } catch (err) {
+      console.error(`❌ [LLM Error: ${purpose}] ${err.message}`);
+      if (purposeGroup === 'inference') {
+        return `[System Error] Neural core timeout or disconnect. (Ref: ${err.message.slice(0, 80)})`;
+      }
+      return '';
+    } finally {
+      if (purposeGroup === 'inference') {
+        this.llmBusy = false;
+      }
+    }
   }
 
   // =========================================================================
@@ -759,7 +800,37 @@ class MemoryKeepEngine {
   // GRAPH MEMORY — Neurographical Knowledge Graph
   // =========================================================================
 
-  // Removed dedicated extractAndStoreGraph as it is now part of unified intakeValve
+  /**
+   * Extract entities and relationships from text and store in the knowledge graph.
+   */
+  async extractAndStoreGraph(text) {
+    const extractPrompt = [
+      {
+        role: 'system',
+        content: 'Extract entities and relationships from the following text. Respond ONLY with raw JSON: {"entities": [{"label": "name", "type": "person|place|concept|thing"}], "relationships": [{"source": "entity1", "target": "entity2", "relationship": "relates_to"}]}. If nothing notable, respond with {"entities":[], "relationships":[]}'
+      },
+      { role: 'user', content: text }
+    ];
+
+    const raw = await this.callLLM(extractPrompt, 'sifting');
+    try {
+      const jsonStart = raw.indexOf('{');
+      const jsonEnd = raw.lastIndexOf('}') + 1;
+      if (jsonStart !== -1 && jsonEnd > jsonStart) {
+        const graph = JSON.parse(raw.slice(jsonStart, jsonEnd));
+        this._storeGraphData(graph);
+      }
+    } catch (err) {
+      console.error('[Graph Extract Parse Error]', err.message);
+    }
+  }
+
+  /**
+   * Get a summary of the graph for heartbeat use.
+   */
+  getGraphSummary() {
+    return this.getGraphStats();
+  }
 
   /**
    * Retrieve related memories by traversing the knowledge graph.
@@ -916,6 +987,7 @@ class MemoryKeepEngine {
 
   async handleMessage(userMsg) {
     this.lastInteraction = Date.now();
+    console.log(`[handleMessage] Processing: "${userMsg.slice(0, 60)}"`);
 
     // --- Async Intake Valve (don't block the response) ---
     this.intakeValve(userMsg).catch(err =>
@@ -923,7 +995,7 @@ class MemoryKeepEngine {
     );
 
     // --- Context Cap Check ---
-    const cap = this.config.app_context_cap || 64000;
+    const cap = this.config.app_context_cap || 32000;
     const currentTokens = this._getStreamTokens();
     if (currentTokens > cap * 0.85) {
       await this.performMemoryKeep();
@@ -933,29 +1005,56 @@ class MemoryKeepEngine {
     let graphContext = '';
     try {
       const graphResult = this.getRelatedMemories(userMsg);
-      if (graphResult.summary) {
+      if (graphResult && graphResult.summary) {
         graphContext = `\n\n[GRAPH MEMORY] ${graphResult.summary}`;
         console.log(`[Graph Recall] ${graphResult.nodes.length} nodes, ${graphResult.edges.length} edges activated.`);
       }
-    } catch (err) { /* non-critical */ }
+    } catch (err) {
+      console.log('[Graph Recall] No graph data yet — that is fine.');
+    }
 
-    // --- Build Task Prompt (Identity handled by callLLM) ---
+    // --- Build Prompt ---
     const toolProtocol = `
 [AGENTIC TOOLS] You have access to the following tools. Use them by writing the tool command on its own line:
-  SEARCH, REMEMBER, TASK_ADD, TASK_LIST, TASK_DONE, ANALYZE, FETCH, READ, WRITE, LIST_FILES, TIME, EMAIL, BROWSE, TELEGRAM.`;
+  SEARCH: <query>, REMEMBER: <key>=<value>, TASK_ADD: <desc>, TASK_LIST, TASK_DONE: <id>, ANALYZE, FETCH: <url>, READ: <path>, WRITE: <path>|<content>, LIST_FILES: <dir>, TIME, EMAIL: <to>|<subject>|<body>, BROWSE: <url>, TELEGRAM: <message>.`;
 
-    const instructions = `${this.coreMemory}\n\nDIRECTIVES:\n${this.directives}${graphContext}\n\n${toolProtocol}`;
+    const contextInfo = graphContext ? `\n${graphContext}` : '';
 
+    // Build message array for callLLM
+    // System instruction is applied inside callLLM (core memory + directives)
+    // Here we add the tool protocol and graph context as a system note
     const messages = [
-      { role: 'system', content: instructions },
-      ...this.stream.slice(-12), // Limit context window for performance
-      { role: 'user', content: userMsg }
+      { role: 'system', content: `${toolProtocol}${contextInfo}` }
     ];
 
-    // --- LLM Call ---
-    let reply = await this.callLLM(messages, 'inference');
+    // Add recent stream context (limit to last 12 turns for performance)
+    const recentStream = this.stream.slice(-12);
+    for (const turn of recentStream) {
+      messages.push({ role: turn.role, content: turn.content });
+    }
 
-    // --- Multi-Tool Agent Loop (Optimized rounds: 2) ---
+    // Add the current user message
+    messages.push({ role: 'user', content: userMsg });
+
+    // --- LLM Call ---
+    console.log(`[handleMessage] Calling LLM with ${messages.length} messages...`);
+    let reply = '';
+    try {
+      reply = await this.callLLM(messages, 'inference');
+    } catch (err) {
+      console.error('[handleMessage] LLM call failed:', err.message);
+      reply = `I'm having trouble connecting to my neural core right now. (${err.message.slice(0, 50)})`;
+    }
+
+    // Safety: ensure we always have a reply
+    if (!reply || reply.trim().length === 0) {
+      console.warn('[handleMessage] Empty reply from LLM, using fallback.');
+      reply = "I heard you, but my neural core returned an empty response. Could you try again?";
+    }
+
+    console.log(`[handleMessage] Got reply (${reply.length} chars): "${reply.slice(0, 80)}..."`);
+
+    // --- Multi-Tool Agent Loop (max 2 rounds) ---
     const TOOL_NAMES = ['SEARCH', 'REMEMBER', 'TASK_ADD', 'TASK_LIST', 'TASK_DONE', 'ANALYZE', 'FETCH', 'READ', 'WRITE', 'LIST_FILES', 'TIME', 'EMAIL', 'BROWSE', 'TELEGRAM'];
     let toolRound = 0;
 
@@ -972,7 +1071,6 @@ class MemoryKeepEngine {
             toolCalls.push({ tool, args });
             break;
           }
-          // Also match tools with no args (ANALYZE, TASK_LIST, TIME)
           if (trimmed.toUpperCase() === tool) {
             toolCalls.push({ tool, args: '' });
             break;
@@ -980,24 +1078,34 @@ class MemoryKeepEngine {
         }
       }
 
-      if (toolCalls.length === 0) break; // No tools detected, done
+      if (toolCalls.length === 0) break;
 
-      // Execute all detected tools
       const results = [];
       for (const { tool, args } of toolCalls) {
         console.log(`[Agent] Executing tool: ${tool}${args ? ' → ' + args.slice(0, 60) : ''}`);
-        const result = await this.executeTool(tool, args);
-        results.push(`[${tool} RESULT]\n${result}`);
+        try {
+          const result = await this.executeTool(tool, args);
+          results.push(`[${tool} RESULT]\n${result}`);
+        } catch (err) {
+          results.push(`[${tool} ERROR] ${err.message}`);
+        }
       }
 
-      // Feed results back to the LLM
       messages.push({ role: 'assistant', content: reply });
       messages.push({
         role: 'system',
         content: `TOOL RESULTS:\n${results.join('\n\n')}\n\nNow compose your final response to the user using these results. Do NOT call tools again unless absolutely necessary.`
       });
 
-      reply = await this.callLLM(messages, 'inference');
+      try {
+        reply = await this.callLLM(messages, 'inference');
+        if (!reply || reply.trim().length === 0) {
+          reply = results.map(r => r).join('\n');
+        }
+      } catch (err) {
+        console.error('[Agent Tool Round Error]', err.message);
+        reply = results.map(r => r).join('\n');
+      }
       toolRound++;
     }
 
@@ -1006,6 +1114,7 @@ class MemoryKeepEngine {
     this.stream.push({ role: 'assistant', content: reply });
     this._saveStream();
 
+    console.log(`[handleMessage] Complete. Reply delivered.`);
     return reply;
   }
 
@@ -1020,19 +1129,22 @@ class MemoryKeepEngine {
     }
     this.lastInteraction = Date.now();
 
-    const visionModel = this.config.vision_model_name || 'pixtral-large-latest';
+    let visionModel = (this.config.vision_model_name || 'gemma-3-27b-it').replace(/^models\//, '');
 
     console.log(`[MAIce Vision] Processing image (${Math.round(imageBase64.length / 1024)}KB) with ${visionModel}`);
 
-    const systemPrompt = `${this.coreMemory}\n\nDIRECTIVES:\n${this.directives}\n\n[VISION TASK] Describe what you see in detail, then respond to the user's message.`;
+    const systemPrompt = `[SYSTEM INSTRUCTIONS]\n${this.coreMemory}\n\nDIRECTIVES:\n${this.directives}\n\n[VISION TASK] Describe what you see in detail, then respond to the user's message.\n[END SYSTEM INSTRUCTIONS]`;
     try {
-      const model = this.genAI.getGenerativeModel({
-        model: visionModel,
-        systemInstruction: systemPrompt
-      });
+      // Gemma 3 does NOT support systemInstruction — just get bare model
+      const model = this.genAI.getGenerativeModel({ model: visionModel });
 
       // Transform context stream to Gemini format (Strict Role Alternating)
       const contents = [];
+
+      // Inject system prompt as opening context
+      contents.push({ role: 'user', parts: [{ text: systemPrompt }] });
+      contents.push({ role: 'model', parts: [{ text: 'Understood. I am ready for the vision task.' }] });
+
       this.stream.slice(-6).forEach(m => {
         let role = m.role === 'assistant' ? 'model' : 'user';
         const lastTurn = contents[contents.length - 1];
@@ -1042,11 +1154,6 @@ class MemoryKeepEngine {
           contents.push({ role, parts: [{ text: m.content }] });
         }
       });
-
-      // Ensure we start with a user turn
-      if (contents.length > 0 && contents[0].role === 'model') {
-        contents.unshift({ role: 'user', parts: [{ text: '[Vision Context]' }] });
-      }
 
       // Parse base64 image data
       const mimeType = imageBase64.split(';')[0].split(':')[1];

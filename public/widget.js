@@ -20,7 +20,7 @@
         }
         #maice-widget-container.expanded {
             width: 450px; /* Wider for persona */
-            height: 600px;
+            height: 500px;
             bottom: 20px;
             right: 20px;
             border-radius: 20px;
@@ -122,9 +122,9 @@
 
     const persona = document.createElement('div');
     persona.id = 'maice-widget-persona';
-    // Use MAGGIE1.png for the rectangular side image, fallback to MAGGIE.png
+    // Use Macie2.png for the rectangular side image
     persona.innerHTML = `
-        <img src="${WIDGET_URL}/images/MAGGIE1.png" 
+        <img src="${WIDGET_URL}/images/Macie2.png" 
              onerror="this.src='${WIDGET_URL}/images/MAGGIE.png'" 
              alt="MAGGIE" 
              style="object-position: top center;">`;
