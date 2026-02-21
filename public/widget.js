@@ -122,9 +122,9 @@
 
     const persona = document.createElement('div');
     persona.id = 'maice-widget-persona';
-    // Use WIDGET_MAGGIE.png for the rectangular side image, fallback to MAGGIE.png
+    // Use MAGGIE1.png for the rectangular side image, fallback to MAGGIE.png
     persona.innerHTML = `
-        <img src="${WIDGET_URL}/images/WIDGET_MAGGIE.png" 
+        <img src="${WIDGET_URL}/images/MAGGIE1.png" 
              onerror="this.src='${WIDGET_URL}/images/MAGGIE.png'" 
              alt="MAGGIE" 
              style="object-position: top center;">`;
