@@ -1,5 +1,5 @@
 /**
- * MAIce Engine — Mistral AI companion Experiment
+ *MAGGIE Engine — Mistral AI companion Experiment
  * ================================================
  * MemoryKeep architecture with agentic tools.
  * 
@@ -74,7 +74,7 @@ class MemoryKeepEngine {
     if (!this.isVercel) {
       this.startHeartbeat();
     } else {
-      console.log('[MAIce] Heartbeat disabled in Vercel environment.');
+      console.log('[MAGGIE] Heartbeat disabled in Vercel environment.');
     }
 
     // --- Telegram Bot (2-way chat) ---
@@ -82,10 +82,10 @@ class MemoryKeepEngine {
     if (!this.isVercel) {
       this.setupTelegramBot();
     } else {
-      console.log('[MAIce] Telegram Bot disabled in Vercel environment.');
+      console.log('[MAGGIE] Telegram Bot disabled in Vercel environment.');
     }
 
-    console.log('[MAIce] Engine initialized.');
+    console.log('[] Engine initialized.');
     console.log(`  Model: ${this.config.model_name}`);
     console.log(`  Vision: ${this.config.vision_model_name}`);
     console.log(`  Sifter: ${this.config.sifter_model_name}`);
@@ -597,12 +597,12 @@ class MemoryKeepEngine {
     const [to, subject, ...bodyParts] = parts;
     const body = bodyParts.join('|');
 
-    const emailUser = process.env.MAICE_EMAIL_USER;
-    const emailPass = process.env.MAICE_EMAIL_PASS;
-    const emailHost = process.env.MAICE_EMAIL_HOST || 'smtp.hostinger.com';
+    const emailUser = process.env.MAGGIE_EMAIL_USER;
+    const emailPass = process.env._EMAIL_PASS;
+    const emailHost = process.env._EMAIL_HOST || 'smtp.hostinger.com';
 
     if (!emailUser || !emailPass) {
-      return 'Email not configured. Set MAICE_EMAIL_USER and MAICE_EMAIL_PASS in .env';
+      return 'Email not configured. Set _EMAIL_USER and _EMAIL_PASS in .env';
     }
 
     try {
@@ -614,7 +614,7 @@ class MemoryKeepEngine {
       });
 
       const info = await transporter.sendMail({
-        from: `"MAIce" <${emailUser}>`,
+        from: `"" <${emailUser}>`,
         to,
         subject,
         text: body,
@@ -958,7 +958,7 @@ class MemoryKeepEngine {
         db.prepare('DELETE FROM graph_edges WHERE weight < 0.1').run();
 
         db.close();
-        console.log('[MAIce] Synaptic pruning complete (Graph weight decay applied).');
+        console.log('[] Synaptic pruning complete (Graph weight decay applied).');
 
         // Step 4 — Flush + Resume
         const overlapN = parseInt(this.config.rolling_overlap || 3);
@@ -969,7 +969,7 @@ class MemoryKeepEngine {
           ...overlap
         ];
         this._saveStream();
-        console.log('[MAIce] Sleep Simulation complete. Waking in fresh context.\n');
+        console.log('[] Sleep Simulation complete. Waking in fresh context.\n');
       } else {
         throw new Error('No valid JSON found in sifter output.');
       }
@@ -1124,14 +1124,14 @@ class MemoryKeepEngine {
 
   async handleVisionMessage(imageBase64, userMsg = 'What do you see in this image?') {
     if (this.config.disable_vision) {
-      console.log('[MAIce Vision] Vision is disabled.');
+      console.log('[ Vision] Vision is disabled.');
       return 'Vision functionality is currently disabled.';
     }
     this.lastInteraction = Date.now();
 
     let visionModel = (this.config.vision_model_name || 'gemma-3-27b-it').replace(/^models\//, '');
 
-    console.log(`[MAIce Vision] Processing image (${Math.round(imageBase64.length / 1024)}KB) with ${visionModel}`);
+    console.log(`[ Vision] Processing image (${Math.round(imageBase64.length / 1024)}KB) with ${visionModel}`);
 
     const systemPrompt = `[SYSTEM INSTRUCTIONS]\n${this.coreMemory}\n\nDIRECTIVES:\n${this.directives}\n\n[VISION TASK] Describe what you see in detail, then respond to the user's message.\n[END SYSTEM INSTRUCTIONS]`;
     try {
@@ -1185,7 +1185,7 @@ class MemoryKeepEngine {
       // Intake valve on the description
       this.intakeValve(`[Vision] User shared an image. AI described: ${reply.slice(0, 200)}`).catch(() => { });
 
-      console.log('[MAIce Vision] Response generated.');
+      console.log('[ Vision] Response generated.');
       return reply;
     } catch (err) {
       console.error('[Vision Error]', err.message);
@@ -1266,7 +1266,7 @@ class MemoryKeepEngine {
 
     try { fs.unlinkSync(path.join(process.cwd(), 'last_snapshot.txt')); } catch { }
 
-    console.log('[MAIce] Brain wiped (including graph + tasks).');
+    console.log('[] Brain wiped (including graph + tasks).');
     return { status: 'success', message: 'Brain wiped. Memory + graph + tasks cleared.' };
   }
   // =========================================================================
@@ -1275,7 +1275,7 @@ class MemoryKeepEngine {
 
   setupTelegramBot() {
     if (this.config.disable_telegram) {
-      console.log('[MAIce] Telegram bot is disabled via config.');
+      console.log('[] Telegram bot is disabled via config.');
       return;
     }
     const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -1283,7 +1283,7 @@ class MemoryKeepEngine {
 
     if (!token || !allowedChatId) return;
 
-    console.log('[MAIce] initializing Telegram bot polling (interval: 30s)...');
+    console.log('[] initializing Telegram bot polling (interval: 30s)...');
     this.telegramBot = new TelegramBot(token, { polling: { interval: 30000, autoStart: true } });
 
     this.telegramBot.on('message', async (msg) => {
@@ -1372,7 +1372,7 @@ class MemoryKeepEngine {
         console.log('[Heartbeat] Skipping cycle: System active or LLM busy.');
         return;
       }
-      console.log('\n--- [MAIce Heartbeat] Autonomous cycle starting ---');
+      console.log('\n--- [ Heartbeat] Autonomous cycle starting ---');
       try {
         const graphData = this.getGraphSummary();
         const taskStats = this.getTaskStats();
@@ -1388,7 +1388,7 @@ class MemoryKeepEngine {
   TASK_ADD: <desc> — Create a task
   ANALYZE: — Analyze your graph
   BROWSE: <url> — Browse a full web page
-  EMAIL: <to> | <subject> | <body> — Send email from maice@companain.life
+  EMAIL: <to> | <subject> | <body> — Send email from @companain.life
   TELEGRAM: <message> — Message the user on Telegram
 
 You have access to your full knowledge graph and memory. Use this time wisely:
@@ -1439,7 +1439,7 @@ Respond with tool calls OR a brief internal thought to remember.`
           console.log(`[Heartbeat Thought] ${heartbeatReply.slice(0, 100)}`);
         }
 
-        console.log('--- [MAIce Heartbeat] Cycle complete ---\n');
+        console.log('--- [ Heartbeat] Cycle complete ---\n');
       } catch (err) {
         console.error('[Heartbeat Error]', err.message);
       }

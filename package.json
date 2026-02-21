@@ -1,5 +1,5 @@
 {
-  "name": "maggie-memorykeep",
+  "name": "MAGGIE-memorykeep",
   "version": "1.0.0",
   "description": "MAGGIE AI Chatbot Liaison with MemoryKeep (Powered by Gemma 3)",
   "main": "server.js",

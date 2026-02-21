@@ -1,11 +1,12 @@
-# MAIce Technical Specifications — Mistral Edition
+# MAGGIE (Memory-Augmented Graph-Guided Intelligent Entity)
+## Technical Specifications (MAGGIE Edition)
 
-This document outlines the specialized **Memory Keep (MK3)** architecture implemented for the MAIce (Mistral AI companion Experiment).
+This document outlines the specialized **Memory Keep (MK3)** architecture implemented for the MAGGIE (Mistral AI companion Experiment).
 
 ---
 
 ## 1. The Full Stack
-MAIce is built on a modern, event-driven Node.js stack designed for low-latency cognition and persistent memory.
+MAGGIE is built on a modern, event-driven Node.js stack designed for low-latency cognition and persistent memory.
 
 *   **Runtime**: Node.js (v18+)
 *   **Web Framework**: Express (serving the API and Neural Hub UI)
@@ -28,9 +29,9 @@ To optimize performance and avoid rate limits, LLM calls are distributed across 
 ---
 
 ## 3. The Seven Layers of Memory
-MAIce utilizes a tiered memory system to maintain long-term coherence while respecting context constraints.
+MAGGIE utilizes a tiered memory system to maintain long-term coherence while respecting context constraints.
 
-1.  **Core Memory**: The immutable identity and soul of MAIce. (Loaded from `core_memory.txt`)
+1.  **Core Memory**: The immutable identity and soul of MAGGIE. (Loaded from `core_memory.txt`)
 2.  **Directives**: Real-time operating protocols and mission focus. (Loaded from `directives.txt`)
 3.  **The Stream**: Active conversation buffer. Capped at **64,000 tokens** (85% of standard context).
 4.  **Experience Memory**: SQLite storage for unstructured facts, events, and "Aha!" moments.
@@ -49,14 +50,14 @@ Every incoming message passes through a classification filter (the **Sifter**) t
 -   **Action**: Does this trigger an immediate agentic task (e.g., adding a reminder)?
 
 ### Sleep Simulation (Consolidation)
-When **The Stream** reaches capacity, MAIce enters a "Sleep Cycle":
+When **The Stream** reaches capacity, MAGGIE enters a "Sleep Cycle":
 1.  **Snapshot**: Captures the entire raw context.
 2.  **Sift**: An independent analytical pass identifies structural patterns.
 3.  **Persist**: High-value insights are written to Experience/Domain memory.
 4.  **Flush**: The active stream is cleared and replaced with a concise summary + trailing context.
 
 ### The Heartbeat
-An autonomous background loop (every 30 mins) that powers MAIce's "subconscious":
+An autonomous background loop (every 30 mins) that powers MAGGIE's "subconscious":
 -   **Reflection**: Reasoning about current tasks and goals.
 -   **Autonomous Research**: Investigating technical topics via **Search/Browse**.
 -   **Maintenance**: Refining Knowledge Graph weights and pruning weak connections.
@@ -64,7 +65,7 @@ An autonomous background loop (every 30 mins) that powers MAIce's "subconscious"
 ---
 
 ## 5. Agentic Toolset
-MAIce is equipped with advanced tools to operate independently:
+MAGGIE is equipped with advanced tools to operate independently:
 
 -   `SEARCH`: Real-time information gathering via DuckDuckGo.
 -   `BROWSE`: Full Puppeteer-based browser automation (Click/Type/Extract).

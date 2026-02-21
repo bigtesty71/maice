@@ -4,9 +4,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MAIce | MAGGIE AI companion Experiment</title>
+  <title> | MAGGIE AI companion Experiment</title>
   <meta name="description"
-    content="MAIce — MAGGIE (Memory-Augmented Graph-Guided Intelligent Entity) Liaison experiment with MemoryKeep (Powered by Gemma 3).">
+    content=" — MAGGIE (Memory-Augmented Graph-Guided Intelligent Entity) Liaison experiment with MemoryKeep (Powered by Gemma 3).">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
@@ -96,7 +96,7 @@
         <div class="widget-title">Task Tracker</div>
         <div class="task-stats" id="task-stats"></div>
         <div class="task-list" id="task-list">
-          <div class="task-empty">No tasks yet. Ask MAIce to create one.</div>
+          <div class="task-empty">No tasks yet. Ask to create one.</div>
         </div>
       </div>
 
@@ -104,8 +104,8 @@
       <div class="widget">
         <div class="widget-title">Keep in Touch</div>
         <div class="email-collect-card">
-          <input type="text" id="collect-name" placeholder="Name (optional)">
-          <input type="email" id="collect-email" placeholder="Email address" required>
+          <input type="text" id="collect-name" placeholder="Name">
+          <input type="email" id="collect-email" placeholder="Email" required>
           <button onclick="submitEmail()" class="action-btn" style="width:100%; margin-top:10px;">Connect</button>
           <div id="collect-status" style="font-size: 0.7rem; margin-top: 8px; text-align: center; display: none;"></div>
         </div>
@@ -430,7 +430,7 @@
     async function copyHistory() {
       const msgs = Array.from(document.querySelectorAll('.message'))
         .filter(m => !m.classList.contains('system-note'))
-        .map(m => (m.classList.contains('user') ? 'JEWELLS: ' : 'MAIce: ') + m.innerText)
+        .map(m => (m.classList.contains('user') ? 'JEWELLS: ' : ': ') + m.innerText)
         .join('\n\n');
       await navigator.clipboard.writeText(msgs);
       alert('Memory log synchronized to clipboard.');

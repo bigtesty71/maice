@@ -1,5 +1,5 @@
 /**
- * MAIce Core Server — Gemma AI companion Experiment
+ * MAGGIE Core Server — Gemma AI companion Experiment
  * ====================================================
  * Express server exposing the MemoryKeep engine via HTTP.
  */
@@ -39,7 +39,7 @@ app.post('/chat', async (req, res) => {
 
         console.log(`\n[Chat] User: ${message.slice(0, 80)}...`);
         const reply = await engine.handleMessage(message);
-        console.log(`[Chat] MAIce: ${reply.slice(0, 80)}...`);
+        console.log(`[Chat] MAGGIE: ${reply.slice(0, 80)}...`);
 
         res.json({ reply });
     } catch (err) {
@@ -60,7 +60,7 @@ app.post('/vision', async (req, res) => {
 
         console.log(`\n[Vision] Image received (${Math.round(image.length / 1024)}KB)`);
         const reply = await engine.handleVisionMessage(image, message || 'What do you see in this image?');
-        console.log(`[Vision] MAIce: ${reply.slice(0, 80)}...`);
+        console.log(`[Vision] MAGGIE ${reply.slice(0, 80)}...`);
 
         res.json({ reply });
     } catch (err) {
