@@ -85,7 +85,7 @@ class MemoryKeepEngine {
       console.log('[MAIce] Telegram Bot disabled in Vercel environment.');
     }
 
-    console.log('[MAGGIE] Engine initialized.');
+    console.log('[MAIce] Engine initialized.');
     console.log(`  Model: ${this.config.model_name}`);
     console.log(`  Vision: ${this.config.vision_model_name}`);
     console.log(`  Sifter: ${this.config.sifter_model_name}`);
