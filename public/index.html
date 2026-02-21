@@ -611,6 +611,24 @@
     }
 
     // ═══════════════════════════
+    // WIDGET METRICS TOGGLE
+    // ═══════════════════════════
+    function toggleMetrics() {
+      const overlay = document.getElementById('metrics-overlay');
+      const isVisible = overlay.classList.toggle('active');
+
+      if (isVisible) {
+        // Refresh metrics content immediately
+        const metrics = document.querySelector('.sidebar .metric-card').cloneNode(true);
+        const gauge = document.querySelector('.sidebar .context-gauge').cloneNode(true);
+        const content = document.getElementById('metrics-content');
+        content.innerHTML = '';
+        content.appendChild(metrics);
+        content.appendChild(gauge);
+      }
+    }
+
+    // ═══════════════════════════
     // INIT
     // ═══════════════════════════
     function init() {
