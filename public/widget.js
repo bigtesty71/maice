@@ -191,6 +191,54 @@
     function toggleWidget() {
         container.classList.toggle('expanded');
     }
+
+    // 3. TTS Bridge (Handles speech for cross-origin iframes)
+    window.addEventListener('message', function (event) {
+        if (event.data && event.data.type === 'MAGGIE_SPEAK') {
+            const text = event.data.text;
+            const synth = window.speechSynthesis;
+
+            // Clean text similar to index.html
+            let clean = text.replace(/```[\s\S]*?```/g, " [Code block] ");
+            clean = clean.replace(/`([^`]+)`/g, "$1");
+            clean = clean.replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1");
+            clean = clean.replace(/[\*\_]{1,3}([^\*\_]+)[\*\_]{1,3}/g, "$1");
+            clean = clean.replace(/[#\-\>\+]/g, "");
+
+            const chunks = clean.match(/[^.!?]+[.!?]*/g) || [clean];
+
+            // Sequential speaking to avoid browser queuing issues
+            const speakSequentially = async () => {
+                for (const chunk of chunks) {
+                    await new Promise((resolve) => {
+                        const utterance = new SpeechSynthesisUtterance(chunk.trim());
+                        const voices = synth.getVoices();
+                        const preferred = voices.find(v => v.name.includes('Zira')) ||
+                            voices.find(v => v.name.includes('Google UK English Female')) ||
+                            voices.find(v => v.name.includes('Female')) ||
+                            voices.find(v => v.lang === 'en-US');
+
+                        if (preferred) utterance.voice = preferred;
+                        utterance.rate = 1.05;
+                        utterance.pitch = 1.05;
+                        utterance.onend = resolve;
+                        utterance.onerror = resolve;
+                        synth.speak(utterance);
+                    });
+                }
+            };
+
+            synth.cancel();
+            speakSequentially();
+        }
+    });
+
+    // Proactive voice loading for the parent
+    if (window.speechSynthesis.onvoiceschanged !== undefined) {
+        window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+    }
+    window.speechSynthesis.getVoices();
+
 })();
 
 

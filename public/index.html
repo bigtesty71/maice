@@ -468,11 +468,18 @@
     async function speakText(text) {
       if (!isTTSActive) return;
 
+      // If in widget mode, try to send to parent first (better for cross-origin iframes)
+      if (window.parent !== window) {
+        window.parent.postMessage({ type: 'MAGGIE_SPEAK', text }, '*');
+        // In widget mode, we rely on parent's speech engine
+        return;
+      }
+
       isSpeechSuppressed = true;
       if (isBrowserListening) recognition?.abort();
 
       const synth = window.speechSynthesis;
-      synth.cancel(); // Force stop any ongoing speech
+      synth.cancel();
 
       let clean = text.replace(/```[\s\S]*?```/g, " [Code block] ");
       clean = clean.replace(/`([^`]+)`/g, "$1");
@@ -480,7 +487,6 @@
       clean = clean.replace(/[\*\_]{1,3}([^\*\_]+)[\*\_]{1,3}/g, "$1");
       clean = clean.replace(/[#\-\>\+]/g, "");
 
-      // Break long text into smaller chunks for more reliable synthesis
       const chunks = clean.match(/[^.!?]+[.!?]*/g) || [clean];
 
       const speakChunk = (chunk) => {
@@ -488,10 +494,11 @@
           const utterance = new SpeechSynthesisUtterance(chunk.trim());
           const voices = synth.getVoices();
 
-          // Preferred MAGGIE voice (Zira or Female English)
+          // Preferred MAGGIE voice (Zira, Google UK Female, or any pleasant female voice)
           const preferred = voices.find(v => v.name.includes('Zira')) ||
-            voices.find(v => v.lang === 'en-US' && v.name.includes('Female')) ||
-            voices.find(v => v.lang.startsWith('en'));
+            voices.find(v => v.name.includes('Google UK English Female')) ||
+            voices.find(v => v.name.includes('Female')) ||
+            voices.find(v => v.lang === 'en-US');
 
           if (preferred) utterance.voice = preferred;
           utterance.rate = 1.05;
@@ -523,12 +530,10 @@
     }
 
     // ═══════════════════════════
-    // SPEECH-TO-TEXT (STT)
+    // SPEECH-TO-TEXT (STT) - SIMPLIFIED
     // ═══════════════════════════
     let recognition = null;
-    let isUserWantsToListen = false;
     let isBrowserListening = false;
-    let isSpeechSuppressed = false; // Flag to prevent STT during AI speech
 
     function initSpeech() {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -552,12 +557,11 @@
         document.getElementById('mic-btn')?.classList.add('recording');
         const status = document.getElementById('footer-status');
         if (status) status.textContent = 'Listening...';
-        console.log('[STT] Browser recording started.');
       };
 
       recognition.onresult = (event) => {
         let fullTranscript = '';
-        for (let i = 0; i < event.results.length; ++i) {
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
           fullTranscript += event.results[i][0].transcript;
         }
         const input = document.getElementById('user-input');
@@ -565,61 +569,45 @@
       };
 
       recognition.onerror = (event) => {
-        if (event.error === 'aborted') {
-          console.log('[STT] Manual pause or AI speech abort.');
-          return;
-        }
         console.error('[STT Error]', event.error);
-        if (event.error === 'not-allowed') {
-          alert('Microphone access denied.');
-          isUserWantsToListen = false;
-        }
+        if (event.error === 'not-allowed') alert('Microphone access denied.');
+        stopRecording();
       };
 
       recognition.onend = () => {
         isBrowserListening = false;
         document.getElementById('mic-btn')?.classList.remove('recording');
-        console.log('[STT] Browser recording ended.');
-
-        if (isUserWantsToListen && !isSpeechSuppressed) {
-          console.log('[STT] Auto-restarting...');
-          try {
-            recognition.start();
-          } catch (e) {
-            console.error('[STT] Auto-restart failed', e);
-          }
-        } else {
-          document.getElementById('footer-status').textContent = isSpeechSuppressed ? 'AI is speaking...' : 'Ready';
-        }
+        const status = document.getElementById('footer-status');
+        if (status) status.textContent = 'Ready';
       };
     }
 
     function toggleMic() {
-      if (!recognition) {
-        initSpeech();
-        if (!recognition) return;
-      }
+      if (!recognition) initSpeech();
+      if (!recognition) return;
 
-      isUserWantsToListen = !isUserWantsToListen;
-      if (isUserWantsToListen) {
-        isSpeechSuppressed = false;
-        if (!isBrowserListening) {
-          try {
-            recognition.start();
-          } catch (e) {
-            console.error('[STT] Start failed', e);
-            isUserWantsToListen = false;
-          }
-        }
+      if (isBrowserListening) {
+        stopRecording();
       } else {
-        if (isBrowserListening) recognition.stop();
+        try {
+          recognition.start();
+        } catch (e) {
+          console.error('[STT] Start failed', e);
+        }
       }
     }
 
     function stopRecording() {
-      isUserWantsToListen = false;
-      if (recognition && isBrowserListening) recognition.stop();
+      if (recognition) {
+        try {
+          recognition.stop();
+          recognition.abort(); // Force hardware release
+        } catch (e) { }
+      }
+      isBrowserListening = false;
+      document.getElementById('mic-btn')?.classList.remove('recording');
     }
+
 
     // ═══════════════════════════
     // EMAIL COLLECTION
