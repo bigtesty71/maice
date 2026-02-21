@@ -47,13 +47,13 @@
         #maice-widget-launcher {
             width: 60px;
             height: 60px;
-            background: #9f7aea;
+            background: #0097b2;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            box-shadow: 0 4px 15px rgba(159, 122, 234, 0.4);
+            box-shadow: 0 4px 15px rgba(0, 151, 178, 0.4);
             font-size: 24px;
             color: white;
             transition: transform 0.2s;
@@ -66,7 +66,7 @@
             height: 100%;
             border: none;
             display: none;
-            background: #050508;
+            background: #291b25;
         }
         #maice-widget-container.expanded #maice-widget-launcher {
             display: none;
@@ -112,7 +112,7 @@
 
     const launcher = document.createElement('div');
     launcher.id = 'maice-widget-launcher';
-    launcher.innerHTML = '⚡';
+    launcher.innerHTML = '✨';
     launcher.onclick = toggleWidget;
 
     const closeBtn = document.createElement('button');
@@ -122,7 +122,7 @@
 
     const persona = document.createElement('div');
     persona.id = 'maice-widget-persona';
-    persona.innerHTML = `<img src="${WIDGET_URL}/images/Macie2.png" alt="Macy" style="object-position: top center;">`;
+    persona.innerHTML = `<img src="${WIDGET_URL}/images/MAGGIE.png" alt="MAGGIE" style="object-position: top center;">`;
 
     const frame = document.createElement('iframe');
     frame.id = 'maice-widget-frame';

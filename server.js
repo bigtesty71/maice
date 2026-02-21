@@ -1,5 +1,5 @@
 /**
- * MAIce Core Server — Mistral AI companion Experiment
+ * MAIce Core Server — Gemma AI companion Experiment
  * ====================================================
  * Express server exposing the MemoryKeep engine via HTTP.
  */
@@ -121,7 +121,7 @@ app.post('/reset', (req, res) => {
 
 app.listen(PORT, () => {
     console.log(`\n╔══════════════════════════════════════════════╗`);
-    console.log(`║   MAIce ACTIVE — Mistral AI companion        ║`);
+    console.log(`║   MAGGIE ACTIVE — Memory-Aug-Graph-Entity    ║`);
     console.log(`║   Port: ${PORT}                                ║`);
     console.log(`║   Mode: Neural-Keep (Graph + Vision)         ║`);
     console.log(`║   UI:   http://localhost:${PORT}                ║`);

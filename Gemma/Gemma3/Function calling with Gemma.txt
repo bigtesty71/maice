@@ -1,0 +1,149 @@
+Function calling with Gemma
+
+
+
+When using a generative artificial intelligence (AI) model such as Gemma, you may want to use the model to operate programming interfaces in order to complete tasks or answer questions. Instructing a model by defining a programming interface and then making a request that uses that interface is called function calling.
+
+Important: A Gemma model cannot execute code on its own. When you generate code with function calling, you must run the generated code yourself or run it as part of your application. Always put safeguards in place to validate any generated code before executing it.
+Gemma does not output a tool specific token. Your framework must detect a tool call by checking if the structure of the output matches your prompted function output specification.
+
+You can use function calling for a number of applications:
+
+Create a natural language interface for a programming API to allow non-programmers to operate a programmatic interface without coding.
+Generate programming calls as part of an AI agent workflow
+FunctionGemma
+FunctionGemma is a specialized version of the Gemma 3 270M model, trained specifically for agentic tasks and tool use. Unlike general-purpose Gemma models that rely strictly on raw text prompting for function definitions, FunctionGemma allows developers to use a specific set of formatting control tokens to define tools and parse outputs more reliably.
+
+For comprehensive details on implementation, see the FunctionGemma formatting and best practices.
+
+Call programming functions
+Function calling is supported in Gemma 3, but the function calling technique can be used with prior versions of Gemma. This guide provides instructions on how to construct Gemma prompts that use function calling. We recommend Gemma3 27B for the best performance, and Gemma3 12B for balanced performance and latency.
+
+You can use function calling with Gemma by constructing a prompt that provides instructions that specify the output format and define the available functions.
+
+When the user prompt is included, the model outputs a function call, which is a string that matches your specified output format. That signals a request to be parsed by your model framework to call the defined functions.
+
+The following prompting sample shows a function definition block, along with a function call syntax, and a function call output from the model. The following example prompt is meant to be used with a programming interface for a product catalog:
+
+
+You have access to functions. If you decide to invoke any of the function(s),
+ you MUST put it in the format of
+[func_name1(params_name1=params_value1, params_name2=params_value2...), func_name2(params)]
+
+You SHOULD NOT include any other text in the response if you call a function
+[
+  {
+    "name": "get_product_name_by_PID",
+    "description": "Finds the name of a product by its Product ID",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "PID": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "PID"
+      ]
+    }
+  }
+]
+While browsing the product catalog, I came across a product that piqued my
+interest. The product ID is 807ZPKBL9V. Can you help me find the name of this
+product?
+This prompt should produce the following response:
+
+
+[get_product_name_by_PID(PID="807ZPKBL9V")]
+This example uses a Python style function call output. Alternatively, you can specify a JSON style output format, as shown in the following example:
+
+
+You have access to functions. If you decide to invoke any of the function(s),
+you MUST put it in the format of
+{"name": function name, "parameters": dictionary of argument name and its value}
+
+You SHOULD NOT include any other text in the response if you call a function
+[
+  {
+    "name": "get_product_name_by_PID",
+    "description": "Finds the name of a product by its Product ID",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "PID": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "PID"
+      ]
+    }
+  }
+]
+While browsing the product catalog, I came across a product that piqued my
+interest. The product ID is 807ZPKBL9V. Can you help me find the name of this
+product?
+This prompt should produce the following response:
+
+
+{"name": "get_product_name_by_PID", "parameters": {"PID": "807ZPKBL9V"}}
+Components of function calling prompt
+When using function calling with Gemma models, your prompt of the model should follow this specific order and structure:
+
+Function calling setup
+Function definitions
+The following sections provide more detail on each of these prompting components.
+
+Function calling setup
+The setup section of the function calling prompt sets the overall expected behavior of the model. You can add additional, general instructions for the model's behavior in this section, such as specifying that the output should be displayed using a print or console.log function. Use Markdown-style single backticks (func_name) to indicate code syntax.
+
+
+You have access to functions. If you decide to invoke any of the function(s),
+you MUST put it in the format of
+{"name": function name, "parameters": dictionary of argument name and its value}
+
+You SHOULD NOT include any other text in the response if you call a function
+These instructions should be as clear and brief as possible. Prioritize the most important instructions and be cautious about providing many general instructions. Gemma models may ignore instructions that are too detailed or not clearly expressed, particularly when you are using model versions with a lower parameter count.
+
+Function definition
+The definition section of the prompt provides the function name, parameters, and output, including a description for each. You can declare functions in the format shown. Single or multiple functions can be defined within the function declaration block.
+
+
+[
+  {
+    "name": "get_product_name_by_PID",
+    "description": "Finds the name of a product by its Product ID",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "PID": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "PID"
+      ]
+    }
+  },
+  {
+    "name": "get_product_price_by_PID",
+    "description": "Finds the price of a product by its Product ID",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "PID": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "PID"
+      ]
+    }
+  }
+]
+Next steps
+Check out ways to deploy and run Gemma models:
+
+Gemma Function Calling Notebook
+Run Gemma with Ollama
+Gemma in PyTorch

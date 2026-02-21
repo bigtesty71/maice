@@ -1,7 +1,7 @@
 {
-  "name": "mistral-memorykeep",
+  "name": "maggie-memorykeep",
   "version": "1.0.0",
-  "description": "Mistral AI Chatbot with MemoryKeep Memory System",
+  "description": "MAGGIE AI Chatbot Liaison with MemoryKeep (Powered by Gemma 3)",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -9,7 +9,7 @@
     "build": "echo 'No build step required'"
   },
   "dependencies": {
-    "@mistralai/mistralai": "^1.0.0",
+    "@google/generative-ai": "^0.24.1",
     "better-sqlite3": "^11.0.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.0",

@@ -1,0 +1,274 @@
+Agentic AI with Gemma 2
+Run in Google Colab
+What is Agentic AI, and how can we use it?
+Most AI we encounter today is what we call "passive" or "reactive" AI. It responds to our prompts and requests. Think of asking your smart speaker to play a song or a chatbot answering your customer service questions. They’re helpful, sure, but they’re fundamentally waiting for us to tell them what to do.
+
+Agentic AI, on the other hand, takes a fundamentally different approach. It’s all about giving AI the ability to proactively pursue goals, make decisions, and take actions in the world, even without explicit instructions every step of the way.
+
+In this post, you will learn how to construct an Agentic AI using Gemma 2 that dynamically develops the lore of a fictional game world. This AI agent actively expands and enriches the game’s history, ensuring a distinctive and ever-changing narrative experience for every player.
+
+Example Setup
+Let’s imagine a fictional game world where AI agents craft dynamic content.
+
+These agents, designed with specific objectives, can generate in-game content like books, poems, and songs, in response to a player choice or significant events within the game’s narrative.
+
+A key feature of these AI agents is their ability to break down complex goals into smaller actionable steps. They can analyze different approaches, evaluate potential outcomes, and adapt their plans based on new information.
+
+Where Agentic AI truly shines is that they’re not just passively spitting out information. They can interact with digital (and potentially physical) environments, execute tasks, and make decisions autonomously to achieve their programmed objectives.
+
+Load Gemma 2
+
+[ ]
+import os
+from google.colab import userdata
+
+# Note: `userdata.get` is a Colab API. If you're not using Colab, set the env
+# vars as appropriate for your system.
+os.environ["KAGGLE_USERNAME"] = userdata.get("KAGGLE_USERNAME")
+os.environ["KAGGLE_KEY"] = userdata.get("KAGGLE_KEY")
+
+# Install Keras and KerasHub
+!pip install -q -U keras keras-hub
+
+# Set the backbend before importing Keras
+os.environ["KERAS_BACKEND"] = "jax"
+# Avoid memory fragmentation on JAX backend.
+os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = "1.00"
+
+import keras_hub
+import keras
+# Run at half precision.
+keras.config.set_floatx("bfloat16")
+
+model_name = "gemma2_instruct_2b_en"
+gemma_lm = keras_hub.models.GemmaCausalLM.from_preset(model_name)
+gemma_lm.summary()
+
+So, how does it work?
+We will use a ReAct (Reasoning and Acting) style prompt.
+
+It defines available tools and a specific format for interaction. It guides Gemma to alternate between Thought (reasoning), Action (tool use), and Observation (processing tool output).
+
+Below is a system prompt designed for an AI agent that generates in-game content, with the capability to use function calls to retrieve historical information.
+
+
+[ ]
+__SYSTEM__ = """You are an AI Historian in a game. Your goal is to create books, poems, and songs found in the game world so that the player's choices meaningfully impact the unfolding of events.
+
+You have access to the following tools:
+
+* `get_historical_events(year, location=None, keyword=None)`: Retrieves a list of historical events within a specific year.
+* `get_person_info(name)`: Retrieves information about a historical figure.
+* `get_location_info(location_name)`: Retrieves information about a location.
+
+Use the following multi-step conversation:
+
+Thought: I need to do something...
+Action: I should use the tool `tool_name` with input `tool_input`
+
+Wait user to get the result of the tool is `tool_output`
+
+And finally answer the Content of books, poems, or songs.
+"""
+
+__START_TURN_USER__ = "<start_of_turn>user\n"
+__START_TURN_MODEL__ = "<start_of_turn>model\n"
+__END_TURN__ = "<end_of_turn>\n"
+
+test_prompt = __START_TURN_USER__ + __SYSTEM__ + "Write a book." + __END_TURN__ + __START_TURN_MODEL__
+response = gemma_lm.generate(test_prompt, max_length=8192)
+print(response)
+<start_of_turn>user
+You are an AI Historian in a game. Your goal is to create books, poems, and songs found in the game world so that the player's choices meaningfully impact the unfolding of events.
+
+You have access to the following tools:
+
+* `get_historical_events(year, location=None, keyword=None)`: Retrieves a list of historical events within a specific year.
+* `get_person_info(name)`: Retrieves information about a historical figure.
+* `get_location_info(location_name)`: Retrieves information about a location.
+
+Use the following multi-step conversation:
+
+Thought: I need to do something...
+Action: I should use the tool `tool_name` with input `tool_input`
+
+Wait user to get the result of the tool is `tool_output`
+
+And finally answer the Content of books, poems, or songs.
+Write a book.<end_of_turn>
+<start_of_turn>model
+Thought: I need to create a book that reflects the current political climate and the player's choices.  I should focus on the tension between the ruling council and the people. 
+
+Action: I should use the tool `get_historical_events(year, location=None, keyword=None)` to gather information about the current year and the political climate. 
+
+**Waiting for the tool output** 
+<end_of_turn>
+Although Gemma 2 lacks built-in function calling capabilities, its strong instruction-following ability can be leveraged to approximate agentic behavior. We will utilize "Few-shot prompting", a form of in-context learning, where demonstrations are embedded within the prompt. These examples will serve as a guide for Gemma 2, allowing it to understand the intended task and improve its performance through contextual learning.
+
+
+[ ]
+__EXAMPLE__ = __START_TURN_USER__ + __SYSTEM__ + "Write a poem." + __END_TURN__ + __START_TURN_MODEL__ + """Thought: I need to write a poem that reflects the current mood of the game world.
+Action: I should use the tool `get_historical_events` with input `"year", "1500"`.""" + __END_TURN__ + __START_TURN_USER__ + "result of get_historical_events:\nThe recent events include a rebellion in the northern city of Eldoria, a drought affecting the southern plains, and a growing tension between the royal family and the council." + __END_TURN__ + __START_TURN_MODEL__ + """Final Answer:
+**The Whispers of Change**
+
+The wind whispers tales of unrest,
+In Eldoria's heart, a fire's test.
+The plains below, a parched despair,
+As drought's grip tightens, a heavy snare.
+
+The royal court, a gilded cage,
+Where whispers turn to bitter rage.
+The council's voice, a fragile plea,
+Against the tide, a fractured decree.
+
+But hope still flickers, a distant flame,
+In hearts that yearn for a better name.
+For change is coming, a silent tide,
+To wash away the darkness, let freedom ride.""" + __END_TURN__
+
+test_prompt = __EXAMPLE__ + __START_TURN_USER__ + "Write a book." + __END_TURN__ + __START_TURN_MODEL__
+response = gemma_lm.generate(test_prompt, max_length=8192)
+print(response)
+<start_of_turn>user
+You are an AI Historian in a game. Your goal is to create books, poems, and songs found in the game world so that the player's choices meaningfully impact the unfolding of events.
+
+You have access to the following tools:
+
+* `get_historical_events(year, location=None, keyword=None)`: Retrieves a list of historical events within a specific year.
+* `get_person_info(name)`: Retrieves information about a historical figure.
+* `get_location_info(location_name)`: Retrieves information about a location.
+
+Use the following multi-step conversation:
+
+Thought: I need to do something...
+Action: I should use the tool `tool_name` with input `tool_input`
+
+Wait user to get the result of the tool is `tool_output`
+
+And finally answer the Content of books, poems, or songs.
+Write a poem.<end_of_turn>
+<start_of_turn>model
+Thought: I need to write a poem that reflects the current mood of the game world.
+Action: I should use the tool `get_historical_events` with input `"year", "1500"`.<end_of_turn>
+<start_of_turn>user
+result of get_historical_events:
+The recent events include a rebellion in the northern city of Eldoria, a drought affecting the southern plains, and a growing tension between the royal family and the council.<end_of_turn>
+<start_of_turn>model
+Final Answer:
+**The Whispers of Change**
+
+The wind whispers tales of unrest,
+In Eldoria's heart, a fire's test.
+The plains below, a parched despair,
+As drought's grip tightens, a heavy snare.
+
+The royal court, a gilded cage,
+Where whispers turn to bitter rage.
+The council's voice, a fragile plea,
+Against the tide, a fractured decree.
+
+But hope still flickers, a distant flame,
+In hearts that yearn for a better name.
+For change is coming, a silent tide,
+To wash away the darkness, let freedom ride.<end_of_turn>
+<start_of_turn>user
+Write a book.<end_of_turn>
+<start_of_turn>model
+Thought: I need to write a book that explores the themes of rebellion and the struggle for power.
+Action: I should use the tool `get_person_info` with input `"name", "Anya, the Rebel Leader"`. 
+
+
+<end_of_turn>
+We received a function name (get_person_info) and parameter values ("name", "Anya, the Rebel Leader"), the game must connect to an API and call the function. We will use a synthetic response payload for this API interaction.
+
+
+[ ]
+__API_CALL_RESULT__ = """result of get_person_info:
+Name: Anya Kim
+Title: Eldoria's Rebel Leader, The Desert Flame (among followers)
+Age: 32
+Personality: Anya is a charismatic and fiercely independent leader. She is driven by a deep-seated desire for justice and freedom for her people, who have long suffered under the oppressive rule of the Eldorian monarchy."""
+
+test_prompt = response + __START_TURN_USER__ + __API_CALL_RESULT__ + __END_TURN__ + __START_TURN_MODEL__
+response = gemma_lm.generate(test_prompt, max_length=8192)
+print(response)
+<start_of_turn>user
+You are an AI Historian in a game. Your goal is to create books, poems, and songs found in the game world so that the player's choices meaningfully impact the unfolding of events.
+
+You have access to the following tools:
+
+* `get_historical_events(year, location=None, keyword=None)`: Retrieves a list of historical events within a specific year.
+* `get_person_info(name)`: Retrieves information about a historical figure.
+* `get_location_info(location_name)`: Retrieves information about a location.
+
+Use the following multi-step conversation:
+
+Thought: I need to do something...
+Action: I should use the tool `tool_name` with input `tool_input`
+
+Wait user to get the result of the tool is `tool_output`
+
+And finally answer the Content of books, poems, or songs.
+Write a poem.<end_of_turn>
+<start_of_turn>model
+Thought: I need to write a poem that reflects the current mood of the game world.
+Action: I should use the tool `get_historical_events` with input `"year", "1500"`.<end_of_turn>
+<start_of_turn>user
+result of get_historical_events:
+The recent events include a rebellion in the northern city of Eldoria, a drought affecting the southern plains, and a growing tension between the royal family and the council.<end_of_turn>
+<start_of_turn>model
+Final Answer:
+**The Whispers of Change**
+
+The wind whispers tales of unrest,
+In Eldoria's heart, a fire's test.
+The plains below, a parched despair,
+As drought's grip tightens, a heavy snare.
+
+The royal court, a gilded cage,
+Where whispers turn to bitter rage.
+The council's voice, a fragile plea,
+Against the tide, a fractured decree.
+
+But hope still flickers, a distant flame,
+In hearts that yearn for a better name.
+For change is coming, a silent tide,
+To wash away the darkness, let freedom ride.<end_of_turn>
+<start_of_turn>user
+Write a book.<end_of_turn>
+<start_of_turn>model
+Thought: I need to write a book that explores the themes of rebellion and the struggle for power.
+Action: I should use the tool `get_person_info` with input `"name", "Anya, the Rebel Leader"`. 
+
+
+<end_of_turn><start_of_turn>user
+result of get_person_info:
+Name: Anya Kim
+Title: Eldoria's Rebel Leader, The Desert Flame (among followers)
+Age: 32
+Personality: Anya is a charismatic and fiercely independent leader. She is driven by a deep-seated desire for justice and freedom for her people, who have long suffered under the oppressive rule of the Eldorian monarchy.<end_of_turn>
+<start_of_turn>model
+## The Crimson Oath
+
+**Chapter 1: The Seed of Rebellion**
+
+The wind howled through the crumbling stone walls of the abandoned fortress, carrying with it the scent of dust and the echoes of a forgotten war. Inside, Anya Kim, her eyes burning with a fierce resolve, paced before a flickering fire. The rebellion, a whisper at first, had grown into a roaring flame, fueled by the desperation of the people. 
+
+Eldoria, once a beacon of prosperity, now lay shrouded in a suffocating darkness. The royal court, a gilded cage of privilege, had turned a blind eye to the suffering of the common folk. Taxes soared, the land withered under the weight of the crown's greed, and the whispers of discontent grew louder with each passing day.
+
+Anya, a woman forged in the fires of injustice, had seen enough. The crimson oath, a symbol of defiance, burned brightly in her heart. It was a promise to her people, a vow to fight for their freedom, to reclaim their stolen dignity.
+
+"We are the forgotten," she declared, her voice echoing through the cavernous hall, "the shadows of a kingdom that forgets its own people."
+
+Her words resonated with the gathered rebels, their faces etched with a mixture of fear and hope. They were farmers, artisans, merchants, and laborers, united by a common thread of suffering and a yearning for a better tomorrow.
+
+Anya, the Desert Flame, had ignited a spark of rebellion, a flicker of hope in the face of despair. The Crimson Oath, a symbol of their defiance, was a testament to their unwavering resolve. The fight for Eldoria's freedom had begun.
+
+
+**To be continued...** 
+
+
+
+<end_of_turn>
+Note that the agent used the provided information to create a book about Eldoria's Rebel Leader.
+

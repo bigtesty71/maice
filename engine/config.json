@@ -1,10 +1,10 @@
 {
-    "model_name": "mistral-medium-latest",
-    "sifter_model_name": "mistral-small-latest",
-    "vision_model_name": "pixtral-large-latest",
-    "app_context_cap": 64000,
-    "rolling_overlap": 3,
+    "model_name": "models/gemma-3-27b-it",
+    "sifter_model_name": "models/gemma-3-4b-it",
+    "vision_model_name": "models/gemma-3-27b-it",
+    "app_context_cap": 128000,
+    "rolling_overlap": 5,
     "heartbeat_minutes": 30,
     "disable_telegram": true,
-    "disable_vision": true
+    "disable_vision": false
 }

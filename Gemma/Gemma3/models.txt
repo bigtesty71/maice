@@ -1,0 +1,38 @@
+Available Gemma 3 Model IDs
+Model Name	API Model ID
+Gemma 3 27B (IT)	models/gemma-3-27b-it
+Gemma 3 12B (IT)	models/gemma-3-12b-it
+Gemma 3 4B (IT)	models/gemma-3-4b-it
+Gemma 3 1B (IT)	models/gemma-3-1b-it
+
+
+The Gemma 3 family of open models is supported by the Gemini API. Earlier versions, such as Gemma 2, have largely been replaced in the standard Gemini API hosted list. 
+Google AI for Developers
+Google AI for Developers
+ +1
+Gemma models that can be called via the Gemini API include:
+gemma-3-27b-it: This is the 27-billion parameter instruction-tuned model. It is designed for high performance on complex tasks.
+gemma-3-12b-it: This is a 12-billion parameter model that balances speed and intelligence.
+gemma-3-4b-it: This is a 4-billion parameter lightweight model for faster inference.
+gemma-3-1b-it: This is the smallest variant, which is optimized for efficiency. 
+Google AI for Developers
+Google AI for Developers
+ +4
+Key Features
+Multimodal Capabilities: Gemma 3 models (except the 1B version) can process both text and image inputs.
+Function Calling: Gemma 3 supports native function calling, which allows it to interact with external tools and APIs.
+Multilingual Support: These models support over 140 languages.
+Context Window: These models feature a long context window of 128K tokens. 
+Google AI for Developers
+Google AI for Developers
+ +4
+Access Methods
+Google AI Studio: Test and prototype with these models directly in the Google AI Studio web interface.
+Gemini API SDKs: Use the google-genai Python SDK or Node.js library to integrate Gemma into your code.
+Vertex AI: Enterprise users can access and tune these models through Vertex AI Model Garden on Google Cloud. 
+Google AI for Developers
+Google AI for Developers
+ +4
+
+
+

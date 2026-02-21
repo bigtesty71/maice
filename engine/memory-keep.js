@@ -6,7 +6,7 @@
  * Architecture (MK3 Blueprint + Graph + Agentic):
  *   1. Core Memory   — identity/personality (always loaded)
  *   2. Directives    — rules/constraints (always loaded)
- *   3. Stream        — active conversation buffer (capped at 85%)
+ *   3. Stream        — active conversation buffer (capped at 50%)
  *   4. Experience    — important past events (SQLite)
  *   5. Domain        — structured job data (SQLite)
  *   6. Graph Memory  — neurographical knowledge graph (nodes + edges)
@@ -15,7 +15,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { Mistral } = require('@mistralai/mistralai');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 const nodemailer = require('nodemailer');
 const puppeteer = require('puppeteer');
 const TelegramBot = require('node-telegram-bot-api');
@@ -26,10 +26,8 @@ class MemoryKeepEngine {
     const cfgFile = configPath || path.join(engineDir, 'config.json');
     this.config = JSON.parse(fs.readFileSync(cfgFile, 'utf-8'));
 
-    // --- Mistral Clients ---
-    this.client = new Mistral({ apiKey: process.env.MISTRAL_API_KEY });
-    this.sifterClient = new Mistral({ apiKey: process.env.MISTRAL_API_KEY_SIFTER || process.env.MISTRAL_API_KEY });
-    this.sidecarClient = new Mistral({ apiKey: process.env.MISTRAL_API_KEY_SIDECAR || process.env.MISTRAL_API_KEY });
+    // --- Google GenAI Client ---
+    this.genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 
     // --- Database ---
     this.isVercel = process.env.VERCEL === '1';
@@ -221,34 +219,54 @@ class MemoryKeepEngine {
       this.lastLLMCall = Date.now();
 
       const purposeGroup = purpose.toLowerCase();
-      let activeClient = this.client;
-      let model = this.config.model_name;
+      let modelId = this.config.model_name;
 
       if (purposeGroup === 'sifting' || purposeGroup === 'classification' || purposeGroup === 'intake-classification') {
-        activeClient = this.sifterClient;
-        model = this.config.sifter_model_name;
-      } else if (purposeGroup === 'background' || purposeGroup === 'taxing' || purposeGroup === 'heartbeat') {
-        activeClient = this.sidecarClient;
-        model = this.config.model_name;
+        modelId = this.config.sifter_model_name;
       }
 
       const temperature = purposeGroup === 'inference' ? 0.7 : 0.1;
 
       try {
-        const response = await activeClient.chat.complete({
-          model,
-          messages,
-          temperature,
+        const model = this.genAI.getGenerativeModel({ model: modelId });
+
+        // Transform messages to Gemini format
+        // Mistral: { role, content } -> Gemini: { role: 'user'|'model', parts: [{ text }] }
+        const contents = messages.map(m => {
+          let role = m.role;
+          if (role === 'assistant') role = 'model';
+          if (role === 'system') {
+            // System instructions are best handled via model config in newer SDKs, 
+            // but for compatibility we can prepend to the first user message or use it as is if supported.
+            // Here we'll treat it as 'user' for simplicity if it's the first message, 
+            // or just keep it as 'system' if the SDK allows (newer versions do).
+          }
+          return {
+            role: role === 'system' ? 'user' : role, // Fallout role for system
+            parts: [{ text: m.content }]
+          };
         });
 
-        if (response.usage) {
-          console.log(`[Token Usage] ${purpose}: ${JSON.stringify(response.usage)}`);
+        const result = await model.generateContent({
+          contents,
+          generationConfig: {
+            temperature,
+            maxOutputTokens: 4096,
+          },
+        });
+
+        const response = result.response;
+        const text = response.text();
+
+        // Gemini doesn't always provide usage in the same format, but we can try to extract it
+        if (response.usageMetadata) {
+          console.log(`[Token Usage] ${purpose}: ${JSON.stringify(response.usageMetadata)}`);
         }
 
-        return response.choices[0].message.content;
+        return text;
       } catch (err) {
         console.error(`[LLM Error] ${purpose}: ${err.message}`);
-        return `Error connecting to Mistral: ${err.message}`;
+        return `Error connecting to Gemma: ${err.message}`;
       } finally {
         this.llmBusy = false;
       }
@@ -818,7 +836,7 @@ Focus on building a knowledge graph of the user's life and technical knowledge.`
   // =========================================================================
 
   async performMemoryKeep() {
-    console.log('\n--- [MAIce] Initiating Sleep Simulation (85% Cap) ---');
+    console.log('\n--- [MAGGIE] Initiating Sleep Simulation (50% Cap / 64k) ---');
 
     // Step 1 — Snapshot
     const snapshot = this.stream.map(m => `${m.role}: ${m.content}`).join('\n');
@@ -900,7 +918,7 @@ Focus on building a knowledge graph of the user's life and technical knowledge.`
     // --- Context Cap Check ---
     const cap = this.config.app_context_cap || 64000;
     const currentTokens = this._getStreamTokens();
-    if (currentTokens > cap * 0.85) {
+    if (currentTokens > cap * 0.50) {
       await this.performMemoryKeep();
     }
 
@@ -1024,26 +1042,35 @@ IMPORTANT:
 
     const systemPrompt = `${this.coreMemory}\n\nDIRECTIVES:\n${this.directives}\n\nYou have been given an image. Describe what you see in detail, then respond to the user's message.`;
 
-    const messages = [
-      { role: 'system', content: systemPrompt },
-      ...this.stream.slice(-6), // Keep some context but limit for vision
-      {
-        role: 'user',
-        content: [
-          { type: 'text', text: userMsg },
-          { type: 'image_url', imageUrl: imageBase64 }
-        ]
-      }
-    ];
-
     try {
-      const response = await this.client.chat.complete({
-        model: visionModel,
-        messages,
-        temperature: 0.7,
+      const model = this.genAI.getGenerativeModel({ model: visionModel });
+
+      // Transform context stream to Gemini format
+      const contents = this.stream.slice(-6).map(m => ({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: m.content }]
+      }));
+
+      // Parse base64 image data
+      const mimeType = imageBase64.split(';')[0].split(':')[1];
+      const base64Data = imageBase64.split(',')[1];
+
+      // Add current user message with image
+      contents.push({
+        role: 'user',
+        parts: [
+          { text: userMsg },
+          { inlineData: { mimeType, data: base64Data } }
+        ]
       });
 
-      const reply = response.choices[0].message.content;
+      const result = await model.generateContent({
+        contents,
+        systemInstruction: systemPrompt, // Use systemInstruction if model supports it, else prepend
+      });
+
+      const response = result.response;
+      const reply = response.text();
 
       // Save text-only versions to stream (can't persist base64)
       this.stream.push({ role: 'user', content: `[Image attached] ${userMsg}` });

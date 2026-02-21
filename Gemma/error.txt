@@ -1,0 +1,36 @@
+The error message indicates that the model "gemma-3-27b-it" is not found or supported for the API version v1. This is because the Gemini API, through the SDK, requires the v1beta endpoint for newer models like Gemma 3.
+The specific model strings for the Gemma 3 family via the Gemini API are:
+
+Available Gemma 3 Model IDs
+
+Model Name	API Model ID
+Gemma 3 27B (IT)	models/gemma-3-27b-it
+Gemma 3 12B (IT)	models/gemma-3-12b-it
+Gemma 3 4B (IT)	models/gemma-3-4b-it
+Gemma 3 1B (IT)	models/gemma-3-1b-it
+
+The error 404 Not Found ... is not supported for generateContent usually means:
+Version Mismatch: The v1 endpoint is being called, but Gemma 3 is under the v1beta version of the API.
+Model Availability: The 27B model might be restricted to specific endpoints, depending on the region or API key permissions.
+To fix this in a Node.js/JavaScript project, explicitly point to the beta version when initializing the Google Generative AI client:
+javascript
+import { GoogleGenerativeAI } from "@google/generative-ai";
+
+// Initialize the SDK with the v1beta version
+const genAI = new GoogleGenerativeAI(process.env.API_KEY);
+const model = genAI.getGenerativeModel(
+  { model: "gemma-3-27b-it" },
+  { apiVersion: "v1beta" } // <--- This is the crucial line
+);
+
+// Your generateContent call should now work
+const result = await model.generateContent("Hello!");
+Use code with caution.
+
+To verify which models the API key can access, run this script:
+javascript
+const listModels = await genAI.getGenerativeModel({ model: "models/gemini-pro" }).listModels();
+console.log(listModels);
+Use code with caution.
+
+
