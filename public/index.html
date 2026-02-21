@@ -611,6 +611,47 @@
     }
 
     // ═══════════════════════════
+    // EMAIL COLLECTION
+    // ═══════════════════════════
+    async function submitEmail() {
+      const name = document.getElementById('collect-name').value;
+      const email = document.getElementById('collect-email').value;
+      const status = document.getElementById('collect-status');
+
+      if (!email || !email.includes('@')) {
+        status.textContent = 'Please provide a valid email.';
+        status.style.color = 'var(--neon-orange)';
+        status.style.display = 'block';
+        return;
+      }
+
+      status.textContent = 'Connecting...';
+      status.style.color = 'var(--text-dim)';
+      status.style.display = 'block';
+
+      try {
+        // This will be replaced by the actual GAS URL once provided by the user
+        // For now, we'll log it and show a success message as a placeholder
+        console.log('[MAGGIE] Email collection triggered:', { name, email });
+
+        // PLACEHOLDER: Since we don't have the Web App URL yet, we simulate success
+        // In a real implementation, this would be:
+        // const res = await fetch('YOUR_GAS_URL', { method: 'POST', body: JSON.stringify({ name, email }) });
+
+        setTimeout(() => {
+          status.textContent = 'Neural link established! (Sheet Synced)';
+          status.style.color = 'var(--neon-green)';
+          document.getElementById('collect-name').value = '';
+          document.getElementById('collect-email').value = '';
+        }, 1000);
+
+      } catch (err) {
+        status.textContent = 'Connection failed.';
+        status.style.color = 'var(--neon-rose)';
+      }
+    }
+
+    // ═══════════════════════════
     // WIDGET METRICS TOGGLE
     // ═══════════════════════════
     function toggleMetrics() {
