@@ -37,8 +37,11 @@ app.post('/chat', async (req, res) => {
             return res.status(400).json({ error: 'Message is required.' });
         }
 
+        // Pass visitor token so MAGGIE knows who she's talking to
+        const visitorToken = req.headers['x-visitor-token'] || null;
+
         console.log(`\n[Chat] User: ${message.slice(0, 80)}...`);
-        const reply = await engine.handleMessage(message);
+        const reply = await engine.handleMessage(message, visitorToken);
         console.log(`[Chat] MAGGIE: ${reply.slice(0, 80)}...`);
 
         res.json({ reply });
@@ -72,9 +75,9 @@ app.post('/vision', async (req, res) => {
 /**
  * GET /status — Memory statistics
  */
-app.get('/status', (req, res) => {
+app.get('/status', async (req, res) => {
     try {
-        const status = engine.getStatus();
+        const status = await engine.getStatus();
         res.json(status);
     } catch (err) {
         console.error('[Status Error]', err);
@@ -92,9 +95,9 @@ app.get('/history', (req, res) => {
 /**
  * GET /graph — Knowledge graph data
  */
-app.get('/graph', (req, res) => {
+app.get('/graph', async (req, res) => {
     try {
-        const stats = engine.getGraphStats();
+        const stats = await engine.getGraphStats();
         res.json(stats);
     } catch (err) {
         console.error('[Graph Error]', err);
@@ -102,8 +105,56 @@ app.get('/graph', (req, res) => {
     }
 });
 
+/**
+ * POST /register — Register or recognize a visitor
+ */
+app.post('/register', async (req, res) => {
+    try {
+        const { name, email } = req.body;
+        if (!email || !email.includes('@')) {
+            return res.status(400).json({ error: 'Valid email is required.' });
+        }
 
+        // Use Origin header for site isolation, fallback to referer or 'default'
+        const origin = req.headers.origin || req.headers.referer || 'default';
+        let siteOrigin = 'default';
+        try { siteOrigin = new URL(origin).hostname || 'default'; } catch { }
 
+        const result = await engine.registerVisitor(name || 'Friend', email, siteOrigin);
+        res.json(result);
+    } catch (err) {
+        console.error('[Register Error]', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
+ * GET /whoami — Look up visitor by token
+ */
+app.get('/whoami', async (req, res) => {
+    try {
+        const token = req.headers['x-visitor-token'];
+        if (!token) {
+            return res.json({ recognized: false });
+        }
+
+        const visitor = await engine.getVisitorByToken(token);
+        if (!visitor) {
+            return res.json({ recognized: false });
+        }
+
+        res.json({
+            recognized: true,
+            name: visitor.name,
+            email: visitor.email,
+            firstSeen: visitor.first_seen,
+            lastSeen: visitor.last_seen
+        });
+    } catch (err) {
+        console.error('[WhoAmI Error]', err);
+        res.json({ recognized: false });
+    }
+});
 
 // =========================================================================
 // START

@@ -21,6 +21,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const nodemailer = require('nodemailer');
 const puppeteer = require('puppeteer');
 const TelegramBot = require('node-telegram-bot-api');
+const mysql = require('mysql2/promise');
 
 class MemoryKeepEngine {
   constructor(configPath = null, dbPath = null) {
@@ -45,10 +46,19 @@ class MemoryKeepEngine {
     // Gemma 3 via Gemini API — single arg constructor
     this.genAI = new GoogleGenerativeAI(this.apiKey);
 
-    // --- Database ---
+    // --- Database (MySQL Persistent Memory) ---
     this.isVercel = process.env.VERCEL === '1';
-    this.dbPath = this.isVercel ? '/tmp/memory_keep.db' : (dbPath || path.join(process.cwd(), 'memory_keep.db'));
-    this.setupStorage();
+    this.pool = mysql.createPool({
+      host: process.env.MYSQL_HOST || '82.197.82.158',
+      user: process.env.MYSQL_USER || 'u649168233_maggie',
+      password: process.env.MYSQL_PASSWORD || 'Revolution_100',
+      database: process.env.MYSQL_DATABASE || 'u649168233_longterm',
+      waitForConnections: true,
+      connectionLimit: 10,
+      queueLimit: 0,
+      connectTimeout: 10000
+    });
+    this.dbReady = this.setupStorage(); // Async — tables created on first await
 
     // Force reload latest config to ensure parity with disk (32k context fix)
     this.config = JSON.parse(fs.readFileSync(cfgFile, 'utf-8'));
@@ -64,9 +74,9 @@ class MemoryKeepEngine {
     // --- Timing & Rate Limiting ---
     this.lastInteraction = Date.now();
     this.lastLLMCall = 0;
-    this.llmQueue = Promise.resolve(); // Queue for serializing LLM calls
-    this.llmBusy = false; // Global lock to prevent overlapping background/foreground calls
-    this.lastPrompts = new Map(); // Store hash/content of recent prompts to prevent redundancy
+    this.llmQueue = Promise.resolve();
+    this.llmBusy = false;
+    this.lastPrompts = new Map();
 
     // --- Heartbeat (autonomous background loop) ---
     this.heartbeatInterval = null;
@@ -85,85 +95,182 @@ class MemoryKeepEngine {
       console.log('[MAGGIE] Telegram Bot disabled in Vercel environment.');
     }
 
-    console.log('[] Engine initialized.');
+    console.log('[MAGGIE] Engine initialized.');
     console.log(`  Model: ${this.config.model_name}`);
     console.log(`  Vision: ${this.config.vision_model_name}`);
     console.log(`  Sifter: ${this.config.sifter_model_name}`);
     console.log(`  Context Cap: ${this.config.app_context_cap} tokens`);
     console.log(`  Heartbeat: every ${this.heartbeatMinutes} minutes`);
-    console.log(`  DB: ${this.dbPath}`);
+    console.log(`  DB: MySQL @ ${process.env.MYSQL_HOST || '82.197.82.158'}`);
   }
 
   // =========================================================================
   // STORAGE SETUP
   // =========================================================================
 
-  setupStorage() {
-    const Database = require('better-sqlite3');
-    const db = new Database(this.dbPath);
+  async setupStorage() {
+    try {
+      await this.pool.execute(`
+        CREATE TABLE IF NOT EXISTS experience_memory (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          content TEXT,
+          timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      await this.pool.execute(`
+        CREATE TABLE IF NOT EXISTS domain_memory (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          \`key\` VARCHAR(255),
+          value TEXT,
+          timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
 
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS experience_memory (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        content TEXT,
-        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS domain_memory (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        key TEXT,
-        value TEXT,
-        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
+      // --- Graph Memory (Neurographical Knowledge Graph) ---
+      await this.pool.execute(`
+        CREATE TABLE IF NOT EXISTS graph_nodes (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          label VARCHAR(255) UNIQUE,
+          type VARCHAR(50) DEFAULT 'entity',
+          strength DOUBLE DEFAULT 1.0,
+          first_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+      await this.pool.execute(`
+        CREATE TABLE IF NOT EXISTS graph_edges (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          source_label VARCHAR(255),
+          target_label VARCHAR(255),
+          relationship VARCHAR(255),
+          weight DOUBLE DEFAULT 1.0,
+          timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE KEY unique_edge (source_label, target_label, relationship)
+        )
+      `);
 
-    // --- Graph Memory (Neurographical Knowledge Graph) ---
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS graph_nodes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        label TEXT UNIQUE,
-        type TEXT DEFAULT 'entity',
-        strength REAL DEFAULT 1.0,
-        first_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
-        last_seen DATETIME DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS graph_edges (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        source_label TEXT,
-        target_label TEXT,
-        relationship TEXT,
-        weight REAL DEFAULT 1.0,
-        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(source_label, target_label, relationship)
-      )
-    `);
+      // --- Tasks (Agentic Task Management) ---
+      await this.pool.execute(`
+        CREATE TABLE IF NOT EXISTS tasks (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          description TEXT,
+          status VARCHAR(20) DEFAULT 'pending',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          completed_at TIMESTAMP NULL
+        )
+      `);
 
-    // --- Tasks (Agentic Task Management) ---
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS tasks (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        description TEXT,
-        status TEXT DEFAULT 'pending',
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        completed_at DATETIME
-      )
-    `);
+      // --- Visitors (User Recognition & Privacy Isolation) ---
+      await this.pool.execute(`
+        CREATE TABLE IF NOT EXISTS visitors (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          name VARCHAR(255),
+          email VARCHAR(255),
+          session_token VARCHAR(255) UNIQUE,
+          site_origin VARCHAR(255) DEFAULT 'default',
+          first_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
 
-    db.close();
+      console.log('[MAGGIE] MySQL tables verified/created.');
+    } catch (err) {
+      console.error('[MAGGIE] MySQL setup error:', err.message);
+    }
   }
 
-  _getDb() {
-    const Database = require('better-sqlite3');
-    return new Database(this.dbPath);
+  // =========================================================================
+  // VISITOR RECOGNITION (User Memory & Privacy Isolation)
+  // =========================================================================
+
+  /**
+   * Register or retrieve a visitor. Returns { token, name, isReturning }
+   * Token is unique per email + site_origin combo for privacy isolation.
+   */
+  async registerVisitor(name, email, siteOrigin = 'default') {
+    await this.dbReady;
+    const crypto = require('crypto');
+
+    // Check if this email already exists for this site
+    const [rows] = await this.pool.execute(
+      'SELECT * FROM visitors WHERE email = ? AND site_origin = ?',
+      [email, siteOrigin]
+    );
+
+    if (rows.length > 0) {
+      const existing = rows[0];
+      // Returning visitor — update last_seen and name if changed
+      await this.pool.execute(
+        'UPDATE visitors SET last_seen = CURRENT_TIMESTAMP, name = ? WHERE id = ?',
+        [name, existing.id]
+      );
+
+      console.log(`[Visitor] Returning visitor: ${name} (${email}) on ${siteOrigin}`);
+      await this.saveExperience(`[Visitor Return] ${name} (${email}) returned. First seen: ${existing.first_seen}. They have visited before.`);
+
+      return {
+        token: existing.session_token,
+        name: existing.name,
+        isReturning: true,
+        firstSeen: existing.first_seen
+      };
+    }
+
+    // New visitor — generate unique token
+    const token = crypto.randomBytes(32).toString('hex');
+
+    await this.pool.execute(
+      'INSERT INTO visitors (name, email, session_token, site_origin) VALUES (?, ?, ?, ?)',
+      [name, email, token, siteOrigin]
+    );
+
+    console.log(`[Visitor] New visitor registered: ${name} (${email}) on ${siteOrigin}`);
+    await this.saveExperience(`[New Visitor] ${name} (${email}) just registered for the first time.`);
+
+    return {
+      token,
+      name,
+      isReturning: false,
+      firstSeen: new Date().toISOString()
+    };
   }
+
+  async getVisitorByToken(token) {
+    if (!token) return null;
+    await this.dbReady;
+
+    const [rows] = await this.pool.execute(
+      'SELECT * FROM visitors WHERE session_token = ?',
+      [token]
+    );
+
+    if (rows.length > 0) {
+      await this.pool.execute(
+        'UPDATE visitors SET last_seen = CURRENT_TIMESTAMP WHERE id = ?',
+        [rows[0].id]
+      );
+      return rows[0];
+    }
+    return null;
+  }
+
+  async getVisitorContext(token) {
+    const visitor = await this.getVisitorByToken(token);
+    if (!visitor) return '';
+
+    const firstDate = new Date(visitor.first_seen).toLocaleDateString('en-US', {
+      month: 'long', day: 'numeric', year: 'numeric'
+    });
+
+    return `\n[ACTIVE VISITOR] You are currently speaking with ${visitor.name}. ` +
+      `They first connected on ${firstDate}. ` +
+      `Address them by name naturally — you remember them.`;
+  }
+
 
   // =========================================================================
   // FLAT FILE LOADERS
   // =========================================================================
-
   _loadFlat(filepath) {
     try {
       return fs.readFileSync(filepath, 'utf-8');
@@ -383,41 +490,36 @@ class MemoryKeepEngine {
   }
 
   // Internal helper for graph persistence
-  _storeGraphData(graph) {
+  async _storeGraphData(graph) {
     try {
-      const db = this._getDb();
+      await this.dbReady;
       // Upsert nodes
-      const upsertNode = db.prepare(`
-        INSERT INTO graph_nodes (label, type) VALUES (?, ?)
-        ON CONFLICT(label) DO UPDATE SET
-          strength = strength + 0.5,
-          last_seen = CURRENT_TIMESTAMP
-      `);
-
       for (const entity of (graph.entities || [])) {
         if (entity.label) {
-          upsertNode.run(entity.label.toLowerCase().trim(), entity.type || 'entity');
+          await this.pool.execute(`
+            INSERT INTO graph_nodes (label, type) VALUES (?, ?)
+            ON DUPLICATE KEY UPDATE
+              strength = strength + 0.5,
+              last_seen = CURRENT_TIMESTAMP
+          `, [entity.label.toLowerCase().trim(), entity.type || 'entity']);
         }
       }
 
       // Upsert edges
-      const upsertEdge = db.prepare(`
-        INSERT INTO graph_edges (source_label, target_label, relationship) VALUES (?, ?, ?)
-        ON CONFLICT(source_label, target_label, relationship) DO UPDATE SET
-          weight = weight + 1.0,
-          timestamp = CURRENT_TIMESTAMP
-      `);
-
       for (const rel of (graph.relationships || [])) {
         if (rel.source && rel.target && rel.relationship) {
-          upsertEdge.run(
+          await this.pool.execute(`
+            INSERT INTO graph_edges (source_label, target_label, relationship) VALUES (?, ?, ?)
+            ON DUPLICATE KEY UPDATE
+              weight = weight + 1.0,
+              timestamp = CURRENT_TIMESTAMP
+          `, [
             rel.source.toLowerCase().trim(),
             rel.target.toLowerCase().trim(),
             rel.relationship.toLowerCase().trim()
-          );
+          ]);
         }
       }
-      db.close();
       console.log(`[Graph] Perspective updated via Intake Valve.`);
     } catch (err) {
       console.error('[Graph Persistence Error]', err.message);
@@ -428,33 +530,31 @@ class MemoryKeepEngine {
   // EXPERIENCE & DOMAIN MEMORY
   // =========================================================================
 
-  saveExperience(content) {
-    const db = this._getDb();
-    db.prepare('INSERT INTO experience_memory (content) VALUES (?)').run(content);
-    db.close();
+  async saveExperience(content) {
+    await this.dbReady;
+    await this.pool.execute('INSERT INTO experience_memory (content) VALUES (?)', [content]);
   }
 
-  saveDomain(key, value) {
-    const db = this._getDb();
-    db.prepare('INSERT INTO domain_memory (key, value) VALUES (?, ?)').run(key, value);
-    db.close();
+  async saveDomain(key, value) {
+    await this.dbReady;
+    await this.pool.execute('INSERT INTO domain_memory (`key`, value) VALUES (?, ?)', [key, value]);
   }
 
-  getRecentExperiences(limit = 5) {
-    const db = this._getDb();
-    const rows = db.prepare(
-      "SELECT content, timestamp FROM experience_memory WHERE content NOT LIKE '[Sifter Pattern]%' ORDER BY timestamp DESC LIMIT ?"
-    ).all(limit);
-    db.close();
+  async getRecentExperiences(limit = 5) {
+    await this.dbReady;
+    const [rows] = await this.pool.execute(
+      "SELECT content, timestamp FROM experience_memory WHERE content NOT LIKE '[Sifter Pattern]%' ORDER BY timestamp DESC LIMIT ?",
+      [limit]
+    );
     return rows;
   }
 
-  getSifterPatterns(limit = 3) {
-    const db = this._getDb();
-    const rows = db.prepare(
-      "SELECT content FROM experience_memory WHERE content LIKE '[Sifter Pattern]%' ORDER BY timestamp DESC LIMIT ?"
-    ).all(limit);
-    db.close();
+  async getSifterPatterns(limit = 3) {
+    await this.dbReady;
+    const [rows] = await this.pool.execute(
+      "SELECT content FROM experience_memory WHERE content LIKE '[Sifter Pattern]%' ORDER BY timestamp DESC LIMIT ?",
+      [limit]
+    );
     return rows.map(r => ({ content: r.content.replace('[Sifter Pattern] ', '') }));
   }
 
@@ -495,34 +595,32 @@ class MemoryKeepEngine {
   // =========================================================================
 
   /** REMEMBER — Save a key-value fact to Domain Memory */
-  toolRemember(args) {
+  async toolRemember(args) {
     const eqIdx = args.indexOf('=');
     if (eqIdx === -1) {
-      this.saveExperience(args.trim());
+      await this.saveExperience(args.trim());
       console.log(`[Tool:REMEMBER] Saved to experience: ${args.trim().slice(0, 60)}`);
       return `Noted and saved to experience memory: "${args.trim()}"`;
     }
     const key = args.slice(0, eqIdx).trim();
     const value = args.slice(eqIdx + 1).trim();
-    this.saveDomain(key, value);
+    await this.saveDomain(key, value);
     console.log(`[Tool:REMEMBER] Saved domain fact: ${key} = ${value.slice(0, 40)}`);
     return `Saved to domain memory: ${key} = ${value}`;
   }
 
   /** TASK_ADD — Create a new task */
-  toolTaskAdd(description) {
-    const db = this._getDb();
-    const info = db.prepare('INSERT INTO tasks (description) VALUES (?)').run(description.trim());
-    db.close();
-    console.log(`[Tool:TASK_ADD] Created task #${info.lastInsertRowid}: ${description.trim()}`);
-    return `Task #${info.lastInsertRowid} created: "${description.trim()}"`;
+  async toolTaskAdd(description) {
+    await this.dbReady;
+    const [result] = await this.pool.execute('INSERT INTO tasks (description) VALUES (?)', [description.trim()]);
+    console.log(`[Tool:TASK_ADD] Created task #${result.insertId}: ${description.trim()}`);
+    return `Task #${result.insertId} created: "${description.trim()}"`;
   }
 
   /** TASK_LIST — List all pending tasks */
-  toolTaskList() {
-    const db = this._getDb();
-    const tasks = db.prepare("SELECT id, description, status, created_at FROM tasks ORDER BY created_at DESC LIMIT 20").all();
-    db.close();
+  async toolTaskList() {
+    await this.dbReady;
+    const [tasks] = await this.pool.execute("SELECT id, description, status, created_at FROM tasks ORDER BY created_at DESC LIMIT 20");
     if (tasks.length === 0) return 'No tasks found. The task list is empty.';
     const lines = tasks.map(t => `#${t.id} [${t.status.toUpperCase()}] ${t.description} (${t.created_at})`);
     console.log(`[Tool:TASK_LIST] ${tasks.length} tasks`);
@@ -530,20 +628,19 @@ class MemoryKeepEngine {
   }
 
   /** TASK_DONE — Mark a task as complete */
-  toolTaskDone(idStr) {
+  async toolTaskDone(idStr) {
     const id = parseInt(idStr.replace('#', '').trim());
     if (isNaN(id)) return 'Invalid task ID.';
-    const db = this._getDb();
-    const changes = db.prepare("UPDATE tasks SET status = 'done', completed_at = CURRENT_TIMESTAMP WHERE id = ?").run(id).changes;
-    db.close();
-    if (changes === 0) return `Task #${id} not found.`;
+    await this.dbReady;
+    const [result] = await this.pool.execute("UPDATE tasks SET status = 'done', completed_at = CURRENT_TIMESTAMP WHERE id = ?", [id]);
+    if (result.affectedRows === 0) return `Task #${id} not found.`;
     console.log(`[Tool:TASK_DONE] Completed task #${id}`);
     return `Task #${id} marked as done.`;
   }
 
   /** ANALYZE — Analyze the knowledge graph for insights */
   async toolAnalyze() {
-    const stats = this.getGraphStats();
+    const stats = await this.getGraphStats();
     if (stats.nodeCount === 0) return 'The knowledge graph is empty. Talk more to build connections.';
 
     const nodesStr = stats.topNodes.map(n => `${n.label} (${n.type}, strength: ${n.strength})`).join(', ');
@@ -767,10 +864,10 @@ class MemoryKeepEngine {
   async executeTool(toolName, toolArgs) {
     switch (toolName) {
       case 'SEARCH': return await this.searchInternet(toolArgs);
-      case 'REMEMBER': return this.toolRemember(toolArgs);
-      case 'TASK_ADD': return this.toolTaskAdd(toolArgs);
-      case 'TASK_LIST': return this.toolTaskList();
-      case 'TASK_DONE': return this.toolTaskDone(toolArgs);
+      case 'REMEMBER': return await this.toolRemember(toolArgs);
+      case 'TASK_ADD': return await this.toolTaskAdd(toolArgs);
+      case 'TASK_LIST': return await this.toolTaskList();
+      case 'TASK_DONE': return await this.toolTaskDone(toolArgs);
       case 'ANALYZE': return await this.toolAnalyze();
       case 'FETCH': return await this.toolFetch(toolArgs);
       case 'READ': return await this.toolRead(toolArgs);
@@ -785,15 +882,14 @@ class MemoryKeepEngine {
   }
 
   /** Get task stats for the status endpoint */
-  getTaskStats() {
-    const db = this._getDb();
-    const pending = db.prepare("SELECT COUNT(*) as count FROM tasks WHERE status = 'pending'").get().count;
-    const done = db.prepare("SELECT COUNT(*) as count FROM tasks WHERE status = 'done'").get().count;
-    const recentTasks = db.prepare(
+  async getTaskStats() {
+    await this.dbReady;
+    const [[pendingRow]] = await this.pool.execute("SELECT COUNT(*) as count FROM tasks WHERE status = 'pending'");
+    const [[doneRow]] = await this.pool.execute("SELECT COUNT(*) as count FROM tasks WHERE status = 'done'");
+    const [recentTasks] = await this.pool.execute(
       "SELECT id, description, status, created_at FROM tasks ORDER BY created_at DESC LIMIT 5"
-    ).all();
-    db.close();
-    return { pending, done, total: pending + done, recentTasks };
+    );
+    return { pending: pendingRow.count, done: doneRow.count, total: pendingRow.count + doneRow.count, recentTasks };
   }
 
   // =========================================================================
@@ -836,39 +932,37 @@ class MemoryKeepEngine {
    * Retrieve related memories by traversing the knowledge graph.
    * Given a query, find matching nodes and walk their edges.
    */
-  getRelatedMemories(query, limit = 8) {
-    const db = this._getDb();
-    // Improved term extraction (ignoring common stop words could be here, but let's keep it simple for now)
+  async getRelatedMemories(query, limit = 8) {
+    await this.dbReady;
     const words = query.toLowerCase().split(/\s+/).filter(w => w.length > 2);
 
-    if (words.length === 0) { db.close(); return []; }
+    if (words.length === 0) return [];
 
-    // Find nodes matching any word in the query, prioritizing high strength
+    // Find nodes matching any word in the query
     const placeholders = words.map(() => 'label LIKE ?').join(' OR ');
     const params = words.map(w => `%${w}%`);
 
-    const matchingNodes = db.prepare(
-      `SELECT label, type, strength FROM graph_nodes WHERE ${placeholders} AND strength > 1.0 ORDER BY strength DESC LIMIT 15`
-    ).all(...params);
+    const [matchingNodes] = await this.pool.execute(
+      `SELECT label, type, strength FROM graph_nodes WHERE (${placeholders}) AND strength > 1.0 ORDER BY strength DESC LIMIT 15`,
+      params
+    );
 
-    if (matchingNodes.length === 0) { db.close(); return []; }
+    if (matchingNodes.length === 0) return [];
 
-    // Walk edges from matching nodes, prioritizing heavy weights
+    // Walk edges from matching nodes
     const nodeLabels = matchingNodes.map(n => n.label);
     const edgePlaceholders = nodeLabels.map(() => '?').join(',');
 
-    const edges = db.prepare(`
+    const [edges] = await this.pool.execute(`
       SELECT source_label, target_label, relationship, weight
       FROM graph_edges
       WHERE (source_label IN (${edgePlaceholders}) OR target_label IN (${edgePlaceholders}))
       AND weight > 0.5
       ORDER BY weight DESC
       LIMIT ?
-    `).all(...nodeLabels, ...nodeLabels, limit);
+    `, [...nodeLabels, ...nodeLabels, limit]);
 
-    db.close();
-
-    // Format as readable context, filtering out weak associations
+    // Format as readable context
     const facts = edges.map(e =>
       `${e.source_label} —[${e.relationship}]→ ${e.target_label}`
     );
@@ -885,19 +979,18 @@ class MemoryKeepEngine {
   /**
    * Get graph statistics for the status endpoint.
    */
-  getGraphStats() {
-    const db = this._getDb();
-    const nodeCount = db.prepare('SELECT COUNT(*) as count FROM graph_nodes').get().count;
-    const edgeCount = db.prepare('SELECT COUNT(*) as count FROM graph_edges').get().count;
-    const topNodes = db.prepare(
+  async getGraphStats() {
+    await this.dbReady;
+    const [[nodeRow]] = await this.pool.execute('SELECT COUNT(*) as count FROM graph_nodes');
+    const [[edgeRow]] = await this.pool.execute('SELECT COUNT(*) as count FROM graph_edges');
+    const [topNodes] = await this.pool.execute(
       'SELECT label, type, strength FROM graph_nodes ORDER BY strength DESC LIMIT 8'
-    ).all();
-    const recentEdges = db.prepare(
+    );
+    const [recentEdges] = await this.pool.execute(
       'SELECT source_label, target_label, relationship FROM graph_edges ORDER BY timestamp DESC LIMIT 5'
-    ).all();
-    db.close();
+    );
 
-    return { nodeCount, edgeCount, topNodes, recentEdges };
+    return { nodeCount: nodeRow.count, edgeCount: edgeRow.count, topNodes, recentEdges };
   }
 
   // =========================================================================
@@ -943,22 +1036,19 @@ class MemoryKeepEngine {
         const analysis = JSON.parse(analysisRaw.slice(jsonStart, jsonEnd));
 
         // Step 3 — Persist patterns & Synaptic Pruning
-        const db = this._getDb();
         for (const pattern of (analysis.patterns || [])) {
-          this.saveExperience(`[Sifter Pattern] ${pattern}`);
+          await this.saveExperience(`[Sifter Pattern] ${pattern}`);
         }
 
         // --- Synaptic Pruning (Lightweight Decay) ---
-        // Decay strength of all nodes and weights of all edges
-        db.prepare('UPDATE graph_nodes SET strength = strength * 0.95').run();
-        db.prepare('UPDATE graph_edges SET weight = weight * 0.95').run();
+        await this.pool.execute('UPDATE graph_nodes SET strength = strength * 0.95');
+        await this.pool.execute('UPDATE graph_edges SET weight = weight * 0.95');
 
         // Remove "forgotten" nodes and edges
-        db.prepare('DELETE FROM graph_nodes WHERE strength < 0.1').run();
-        db.prepare('DELETE FROM graph_edges WHERE weight < 0.1').run();
+        await this.pool.execute('DELETE FROM graph_nodes WHERE strength < 0.1');
+        await this.pool.execute('DELETE FROM graph_edges WHERE weight < 0.1');
 
-        db.close();
-        console.log('[] Synaptic pruning complete (Graph weight decay applied).');
+        console.log('[MAGGIE] Synaptic pruning complete (Graph weight decay applied).');
 
         // Step 4 — Flush + Resume
         const overlapN = parseInt(this.config.rolling_overlap || 3);
@@ -985,7 +1075,7 @@ class MemoryKeepEngine {
   // HANDLE MESSAGE — Main entry point
   // =========================================================================
 
-  async handleMessage(userMsg) {
+  async handleMessage(userMsg, visitorToken = null) {
     this.lastInteraction = Date.now();
     console.log(`[handleMessage] Processing: "${userMsg.slice(0, 60)}"`);
 
@@ -1001,10 +1091,16 @@ class MemoryKeepEngine {
       await this.performMemoryKeep();
     }
 
+    // --- Visitor Context (Who is MAGGIE talking to?) ---
+    let visitorContext = '';
+    if (visitorToken) {
+      visitorContext = await this.getVisitorContext(visitorToken);
+    }
+
     // --- Graph Recall (Passive Associative Retrieval) ---
     let graphContext = '';
     try {
-      const graphResult = this.getRelatedMemories(userMsg);
+      const graphResult = await this.getRelatedMemories(userMsg);
       if (graphResult && graphResult.summary) {
         graphContext = `\n\n[GRAPH MEMORY] ${graphResult.summary}`;
         console.log(`[Graph Recall] ${graphResult.nodes.length} nodes, ${graphResult.edges.length} edges activated.`);
@@ -1022,9 +1118,9 @@ class MemoryKeepEngine {
 
     // Build message array for callLLM
     // System instruction is applied inside callLLM (core memory + directives)
-    // Here we add the tool protocol and graph context as a system note
+    // Here we add the tool protocol, visitor context, and graph context
     const messages = [
-      { role: 'system', content: `${toolProtocol}${contextInfo}` }
+      { role: 'system', content: `${toolProtocol}${visitorContext}${contextInfo}` }
     ];
 
     // Add recent stream context (limit to last 12 turns for performance)
@@ -1197,46 +1293,44 @@ class MemoryKeepEngine {
   // STATUS — Memory statistics
   // =========================================================================
 
-  getStatus() {
-    const db = this._getDb();
+  async getStatus() {
+    await this.dbReady;
 
-    const expCount = db.prepare('SELECT COUNT(*) as count FROM experience_memory').get().count;
-    const domCount = db.prepare('SELECT COUNT(*) as count FROM domain_memory').get().count;
+    const [[expRow]] = await this.pool.execute('SELECT COUNT(*) as count FROM experience_memory');
+    const [[domRow]] = await this.pool.execute('SELECT COUNT(*) as count FROM domain_memory');
 
-    const recentRows = db.prepare(
+    const [recentRows] = await this.pool.execute(
       "SELECT content, timestamp FROM experience_memory WHERE content NOT LIKE '[Sifter Pattern]%' ORDER BY timestamp DESC LIMIT 5"
-    ).all();
+    );
 
     const recent = recentRows.map(row => ({
       content: row.content.length > 70 ? row.content.slice(0, 70) + '..' : row.content,
       timestamp: row.timestamp
     }));
 
-    const patternRows = db.prepare(
+    const [patternRows] = await this.pool.execute(
       "SELECT content FROM experience_memory WHERE content LIKE '[Sifter Pattern]%' ORDER BY timestamp DESC LIMIT 3"
-    ).all();
+    );
 
     const patterns = patternRows.map(r => ({
       content: r.content.replace('[Sifter Pattern] ', '')
     }));
 
-    db.close();
-
     // --- Graph Stats ---
-    const graph = this.getGraphStats();
+    const graph = await this.getGraphStats();
 
     // --- Task Stats ---
-    const taskStats = this.getTaskStats();
+    const taskStats = await this.getTaskStats();
 
     return {
-      experience_count: expCount,
-      domain_count: domCount,
+      experience_count: expRow.count,
+      domain_count: domRow.count,
       recent_experiences: recent,
       sifter_patterns: patterns,
       stream_messages: this.stream.length,
       stream_tokens: this._getStreamTokens(),
       context_cap: this.config.app_context_cap,
-      bot_mode: 'Neural-Keep (Graph)',
+      bot_mode: 'Neural-Keep (Graph + MySQL)',
       graph_nodes: graph.nodeCount,
       graph_edges: graph.edgeCount,
       graph_top_nodes: graph.topNodes,
@@ -1252,21 +1346,20 @@ class MemoryKeepEngine {
   // RESET — Wipe everything
   // =========================================================================
 
-  reset() {
-    const db = this._getDb();
-    db.exec('DELETE FROM experience_memory');
-    db.exec('DELETE FROM domain_memory');
-    db.exec('DELETE FROM graph_nodes');
-    db.exec('DELETE FROM graph_edges');
-    db.exec('DELETE FROM tasks');
-    db.close();
+  async reset() {
+    await this.dbReady;
+    await this.pool.execute('DELETE FROM experience_memory');
+    await this.pool.execute('DELETE FROM domain_memory');
+    await this.pool.execute('DELETE FROM graph_nodes');
+    await this.pool.execute('DELETE FROM graph_edges');
+    await this.pool.execute('DELETE FROM tasks');
 
     this.stream = [];
     this._saveStream();
 
     try { fs.unlinkSync(path.join(process.cwd(), 'last_snapshot.txt')); } catch { }
 
-    console.log('[] Brain wiped (including graph + tasks).');
+    console.log('[MAGGIE] Brain wiped (including graph + tasks).');
     return { status: 'success', message: 'Brain wiped. Memory + graph + tasks cleared.' };
   }
   // =========================================================================
@@ -1374,8 +1467,8 @@ class MemoryKeepEngine {
       }
       console.log('\n--- [ Heartbeat] Autonomous cycle starting ---');
       try {
-        const graphData = this.getGraphSummary();
-        const taskStats = this.getTaskStats();
+        const graphData = await this.getGraphSummary();
+        const taskStats = await this.getTaskStats();
         const now = new Date();
 
         const heartbeatPrompt = [

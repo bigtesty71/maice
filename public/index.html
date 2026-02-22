@@ -170,8 +170,11 @@
     const API = '';
     let isProcessing = false;
     let pendingImage = null;
-    let isUserWantsToListen = false; // Added to fix ReferenceError
-    let isSpeechSuppressed = false; // Added for completeness based on usage
+    let isUserWantsToListen = false;
+    let isSpeechSuppressed = false;
+
+    // --- Visitor Recognition ---
+    let visitorToken = localStorage.getItem('maggie_visitor_token') || null;
 
     // Detect Widget Mode
     const urlParams = new URLSearchParams(window.location.search);
@@ -313,11 +316,14 @@
       addTyping(thinkingId);
 
       try {
+        const headers = { 'Content-Type': 'application/json' };
+        if (visitorToken) headers['x-visitor-token'] = visitorToken;
+
         let data;
         if (pendingImage) {
           const res = await fetch(`${API}/vision`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: headers,
             body: JSON.stringify({ image: pendingImage, message: text || 'What do you see?' })
           });
           data = await res.json();
@@ -325,7 +331,7 @@
         } else {
           const res = await fetch(`${API}/chat`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: headers,
             body: JSON.stringify({ message: text })
           });
           data = await res.json();
@@ -673,31 +679,75 @@
 
       if (!email || !email.includes('@')) {
         status.textContent = 'Please provide a valid email.';
-        status.style.color = 'var(--neon-orange)';
-        status.style.display = 'block';
+        statusElement.textContent = 'Please enter a valid email.';
         return;
       }
 
-      status.textContent = 'Connecting...';
-      status.style.color = 'var(--text-dim)';
-      status.style.display = 'block';
+      statusElement.textContent = 'Connecting with identity core...';
 
       try {
-        await fetch('https://script.google.com/macros/s/AKfycbxtzF0SoQZscZm1GFQ8yqNJgUTM9u-qWPmjC9cT1-Kq_qbcVofKuquYsGsI7nJ5CWg/exec', {
+        // 1. Register with MAGGIE's Backend (MySQL)
+        const regRes = await fetch(`${API}/register`, {
           method: 'POST',
-          mode: 'no-cors',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, email })
         });
+        const regData = await regRes.json();
 
-        status.textContent = 'Neural link established! (Sheet Synced)';
-        status.style.color = 'var(--neon-green)';
-        if (nameInput) nameInput.value = '';
-        if (emailInput) emailInput.value = '';
+        if (regData.token) {
+          visitorToken = regData.token;
+          localStorage.setItem('maggie_visitor_token', visitorToken);
+          console.log('[Visitor] Registered and token saved.');
+        }
 
+        // 2. Sync with Google Sheets (Existing logic)
+        const scriptURL = 'https://script.google.com/macros/s/AKfycbyv9O9f-pX-LID_mH87H33IExSInV_U9V67_K68n3F4m8R8F-Q8R8F-X4m8R8F-Q/exec';
+        await fetch(scriptURL, {
+          method: 'POST',
+          body: new FormData(document.getElementById('contact-form')),
+          mode: 'no-cors'
+        });
+
+        statusElement.textContent = regData.isReturning ?
+          `Welcome back, ${regData.name}! She remembers you.` :
+          'Registration complete. She knows who you are now.';
+
+        statusElement.style.color = '#00ffcc';
+
+        setTimeout(() => {
+          toggleContact();
+          // Ask MAGGIE to greet the new user if new
+          if (!regData.isReturning) {
+            addMessage(`(A new friend has joined: ${name})`, 'user');
+            handleSend();
+          }
+        }, 2000);
+
+      } catch (error) {
+        console.error('Submission failed', error);
+        statusElement.textContent = 'Connection failed. Please try again.';
+        statusElement.style.color = '#ff4b2b';
+      }
+    }
+
+    async function checkVisitorIdentity() {
+      if (!visitorToken) return;
+      try {
+        const res = await fetch(`${API}/whoami`, {
+          headers: { 'x-visitor-token': visitorToken }
+        });
+        const data = await res.json();
+        if (data.recognized) {
+          console.log(`[Visitor] Recognized as ${data.name}`);
+          // Optional: Add a subtle hint in UI that she knows you
+          document.getElementById('footer-status').textContent = `Recognized: ${data.name}`;
+        } else {
+          // Token invalid or burned? Clean up.
+          visitorToken = null;
+          localStorage.removeItem('maggie_visitor_token');
+        }
       } catch (err) {
-        status.textContent = 'Connection failed.';
-        status.style.color = 'var(--neon-rose)';
+        console.error('[Visitor Check Error]', err);
       }
     }
 
@@ -733,13 +783,21 @@
     // ═══════════════════════════
     // INIT
     // ═══════════════════════════
-    function init() {
-      // Fetch status immediately, then retry after 3s in case of cold start
-      updateStatus();
-      setTimeout(updateStatus, 3000);
+    async function init() {
+      // First, check if we recognize the user
+      await checkVisitorIdentity();
 
+      // Update status immediately
+      updateStatus();
+
+      // Load chat history
       loadHistory();
+
+      // Initialize speech
       initSpeech();
+
+      // Polling for metrics
+      setInterval(updateStatus, 30000); // Poll every 30s
 
       // Refresh stats every 5 minutes to stay current
       setInterval(updateStatus, 300000);
