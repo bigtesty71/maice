@@ -156,6 +156,20 @@ app.get('/whoami', async (req, res) => {
     }
 });
 
+/**
+ * POST /api/telegram — Telegram Webhook Receiver
+ */
+app.post('/api/telegram', async (req, res) => {
+    try {
+        console.log('[Telegram Webhook] Received update.');
+        await engine.handleTelegramWebhook(req.body);
+        res.json({ ok: true });
+    } catch (err) {
+        console.error('[Telegram Webhook Error]', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // =========================================================================
 // START
 // =========================================================================

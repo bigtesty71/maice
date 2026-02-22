@@ -89,11 +89,7 @@ class MemoryKeepEngine {
 
     // --- Telegram Bot (2-way chat) ---
     this.telegramBot = null;
-    if (!this.isVercel) {
-      this.setupTelegramBot();
-    } else {
-      console.log('[MAGGIE] Telegram Bot disabled in Vercel environment.');
-    }
+    this.setupTelegramBot();
 
     console.log('[MAGGIE] Engine initialized.');
     console.log(`  Model: ${this.config.model_name}`);
@@ -1366,9 +1362,9 @@ class MemoryKeepEngine {
   // TELEGRAM — 2-Way Chat & Tools
   // =========================================================================
 
-  setupTelegramBot() {
+  async setupTelegramBot() {
     if (this.config.disable_telegram) {
-      console.log('[] Telegram bot is disabled via config.');
+      console.log('[MAGGIE] Telegram bot is disabled via config.');
       return;
     }
     const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -1376,49 +1372,67 @@ class MemoryKeepEngine {
 
     if (!token || !allowedChatId) return;
 
-    console.log('[] initializing Telegram bot polling (interval: 30s)...');
-    this.telegramBot = new TelegramBot(token, { polling: { interval: 30000, autoStart: true } });
+    // On Vercel, we use Webhooks. Locally, we use Polling.
+    if (this.isVercel) {
+      console.log('[MAGGIE] Telegram bot initialized in Webhook mode.');
+      this.telegramBot = new TelegramBot(token); // No polling
 
-    this.telegramBot.on('message', async (msg) => {
-      const chatId = msg.chat.id.toString();
-      const text = msg.text;
-
-      // Security check: only allow configured user
-      if (chatId !== allowedChatId) {
-        console.log(`[Telegram] Ignored message from unauthorized chat: ${chatId} (${msg.from.first_name})`);
-        return;
-      }
-
-      if (!text) return;
-
-      console.log(`[Telegram] Received from user: "${text}"`);
-
-      // Indicate typing
-      this.telegramBot.sendChatAction(chatId, 'typing');
-
-      try {
-        // Process through main engine logic
-        const response = await this.handleMessage(text);
-
-        // Send reply back to Telegram
-        if (response.reply) {
-          // Convert simpler markdown if needed, or just send
-          await this.telegramBot.sendMessage(chatId, response.reply, { parse_mode: 'Markdown' });
-        } else if (response.error) {
-          await this.telegramBot.sendMessage(chatId, `⚠ Error: ${response.error}`);
+      // Auto-set webhook if VERCEL_URL is present
+      const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null;
+      if (baseUrl) {
+        try {
+          await this.telegramBot.setWebHook(`${baseUrl}/api/telegram`);
+          console.log(`[MAGGIE] Telegram Webhook set to: ${baseUrl}/api/telegram`);
+        } catch (err) {
+          console.error('[MAGGIE] Failed to set Telegram Webhook:', err.message);
         }
-
-        // If tasks were updated or graph changed, maybe mention it? 
-        // For now, just the reply is fine.
-      } catch (err) {
-        console.error('[Telegram Error]', err.message);
-        this.telegramBot.sendMessage(chatId, `⚠ Error processing message: ${err.message}`);
       }
-    });
+    } else {
+      console.log('[MAGGIE] Initializing Telegram bot polling (interval: 30s)...');
+      this.telegramBot = new TelegramBot(token, { polling: { interval: 30000, autoStart: true } });
+
+      this.telegramBot.on('message', async (msg) => {
+        await this._handleIncomingTelegram(msg);
+      });
+    }
 
     this.telegramBot.on('polling_error', (error) => {
       console.error(`[Telegram Polling] ${error.code}: ${error.message}`);
     });
+  }
+
+  /** Centralized handler for Telegram messages */
+  async _handleIncomingTelegram(msg) {
+    const allowedChatId = process.env.TELEGRAM_CHAT_ID;
+    const chatId = msg.chat.id.toString();
+    const text = msg.text;
+
+    if (chatId !== allowedChatId) {
+      console.log(`[Telegram] Ignored message from unauthorized chat: ${chatId} (${msg.from.first_name})`);
+      return;
+    }
+
+    if (!text) return;
+
+    console.log(`[Telegram] Received from user: "${text}"`);
+
+    try {
+      this.telegramBot.sendChatAction(chatId, 'typing');
+      const response = await this.handleMessage(text);
+      if (response) {
+        await this.telegramBot.sendMessage(chatId, response, { parse_mode: 'Markdown' });
+      }
+    } catch (err) {
+      console.error('[Telegram Error]', err.message);
+      this.telegramBot.sendMessage(chatId, `⚠ Error processing message: ${err.message}`);
+    }
+  }
+
+  /** API Entry point for Vercel Webhooks */
+  async handleTelegramWebhook(update) {
+    if (update.message) {
+      await this._handleIncomingTelegram(update.message);
+    }
   }
 
   async toolTelegram(message) {
