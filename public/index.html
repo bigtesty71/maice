@@ -127,7 +127,7 @@
         <button id="metrics-btn" class="action-btn" onclick="toggleMetrics()" title="Neural Metrics">🧠 STATS</button>
         <button id="tts-toggle" onclick="toggleTTS()" class="action-btn" title="Toggle Voice">🔈 ON</button>
         <button onclick="copyHistory()" class="action-btn">COPY LOGS</button>
-        <button onclick="resetBrain()" class="action-btn danger">RESET</button>
+
       </div>
     </div>
 
@@ -140,9 +140,7 @@
       <div id="metrics-content">
         <!-- Cloned from sidebar widgets via JS -->
       </div>
-      <div class="metrics-footer">
-        <button onclick="resetBrain()" class="action-btn danger" style="width:100%">WIPE ALL MEMORY</button>
-      </div>
+
     </div>
 
     <div id="chat-container">
@@ -409,17 +407,7 @@
       } catch { /* first load */ }
     }
 
-    async function resetBrain() {
-      if (!confirm('⚠ This will wipe all memories. Are you sure?')) return;
-      try {
-        await fetch(`${API}/reset`, { method: 'POST' });
-        document.getElementById('chat-container').innerHTML =
-          '<div class="message system-note">Brain wiped. Neural Bridge reconnected.</div>';
-        updateStatus();
-      } catch (err) {
-        alert('Reset failed: ' + err.message);
-      }
-    }
+
 
     async function copyHistory() {
       const msgs = Array.from(document.querySelectorAll('.message'))
@@ -746,16 +734,15 @@
     // INIT
     // ═══════════════════════════
     function init() {
+      // Fetch status immediately, then retry after 3s in case of cold start
       updateStatus();
+      setTimeout(updateStatus, 3000);
+
       loadHistory();
       initSpeech();
 
-      // Ensure voices are loaded for TTS
-      if (window.speechSynthesis.onvoiceschanged !== undefined) {
-        window.speechSynthesis.onvoiceschanged = () => { window.speechSynthesis.getVoices(); };
-      }
-
-      setInterval(updateStatus, 1200000); // Poll status every 20 minutes
+      // Refresh stats every 5 minutes to stay current
+      setInterval(updateStatus, 300000);
     }
 
     // Start

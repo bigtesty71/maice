@@ -102,18 +102,8 @@ app.get('/graph', (req, res) => {
     }
 });
 
-/**
- * POST /reset — Wipe database and reset stream
- */
-app.post('/reset', (req, res) => {
-    try {
-        const result = engine.reset();
-        res.json(result);
-    } catch (err) {
-        console.error('[Reset Error]', err);
-        res.status(500).json({ error: err.message });
-    }
-});
+
+
 
 // =========================================================================
 // START
