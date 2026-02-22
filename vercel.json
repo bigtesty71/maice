@@ -10,7 +10,8 @@
         "VERCEL": "1",
         "MYSQL_HOST": "db.memorykeep.cloud",
         "MYSQL_USER": "u649168233_maggie",
-        "MYSQL_DATABASE": "u649168233_longterm"
+        "MYSQL_DATABASE": "u649168233_longterm",
+        "MAGGIE_EMAIL_HOST": "smtp.hostinger.com"
     },
     "routes": [
         {

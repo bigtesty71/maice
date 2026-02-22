@@ -695,11 +695,11 @@ class MemoryKeepEngine {
     const body = bodyParts.join('|');
 
     const emailUser = process.env.MAGGIE_EMAIL_USER;
-    const emailPass = process.env._EMAIL_PASS;
-    const emailHost = process.env._EMAIL_HOST || 'smtp.hostinger.com';
+    const emailPass = process.env.MAGGIE_EMAIL_PASS;
+    const emailHost = process.env.MAGGIE_EMAIL_HOST || 'smtp.hostinger.com';
 
     if (!emailUser || !emailPass) {
-      return 'Email not configured. Set _EMAIL_USER and _EMAIL_PASS in .env';
+      return 'Email not configured. Set MAGGIE_EMAIL_USER and MAGGIE_EMAIL_PASS in .env';
     }
 
     try {
@@ -711,7 +711,7 @@ class MemoryKeepEngine {
       });
 
       const info = await transporter.sendMail({
-        from: `"" <${emailUser}>`,
+        from: `"MAGGIE" <${emailUser}>`,
         to,
         subject,
         text: body,
