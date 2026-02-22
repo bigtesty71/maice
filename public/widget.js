@@ -193,32 +193,49 @@
     }
 
     // 3. TTS Bridge (Handles speech for cross-origin iframes)
+    let widgetVoice = null;
+
+    function loadWidgetVoices() {
+        const voices = window.speechSynthesis.getVoices();
+        if (voices.length === 0) return;
+        widgetVoice =
+            voices.find(v => v.name.includes('Zira')) ||
+            voices.find(v => v.name.includes('Google UK English Female')) ||
+            voices.find(v => v.name.toLowerCase().includes('female') && v.lang.startsWith('en')) ||
+            voices.find(v => v.lang === 'en-US') ||
+            voices[0];
+    }
+    loadWidgetVoices();
+    if (window.speechSynthesis.onvoiceschanged !== undefined) {
+        window.speechSynthesis.onvoiceschanged = loadWidgetVoices;
+    }
+
     window.addEventListener('message', function (event) {
         if (event.data && event.data.type === 'MAGGIE_SPEAK') {
-            const text = event.data.text;
             const synth = window.speechSynthesis;
+            synth.cancel();
 
-            // Clean text similar to index.html
-            let clean = text.replace(/```[\s\S]*?```/g, " [Code block] ");
-            clean = clean.replace(/`([^`]+)`/g, "$1");
-            clean = clean.replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1");
-            clean = clean.replace(/[\*\_]{1,3}([^\*\_]+)[\*\_]{1,3}/g, "$1");
-            clean = clean.replace(/[#\-\>\+]/g, "");
+            let clean = event.data.text;
+            clean = clean.replace(/```[\s\S]*?```/g, ' code block ');
+            clean = clean.replace(/`([^`]+)`/g, '$1');
+            clean = clean.replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1');
+            clean = clean.replace(/[\*\_]{1,3}([^\*\_]+)[\*\_]{1,3}/g, '$1');
+            clean = clean.replace(/#{1,6}\s*/g, '');
+            clean = clean.replace(/[->\+\|]/g, '');
+            clean = clean.replace(/\n{2,}/g, '. ');
+            clean = clean.replace(/\s{2,}/g, ' ').trim();
+
+            if (!clean) return;
 
             const chunks = clean.match(/[^.!?]+[.!?]*/g) || [clean];
 
-            // Sequential speaking to avoid browser queuing issues
             const speakSequentially = async () => {
                 for (const chunk of chunks) {
+                    const trimmed = chunk.trim();
+                    if (!trimmed) continue;
                     await new Promise((resolve) => {
-                        const utterance = new SpeechSynthesisUtterance(chunk.trim());
-                        const voices = synth.getVoices();
-                        const preferred = voices.find(v => v.name.includes('Zira')) ||
-                            voices.find(v => v.name.includes('Google UK English Female')) ||
-                            voices.find(v => v.name.includes('Female')) ||
-                            voices.find(v => v.lang === 'en-US');
-
-                        if (preferred) utterance.voice = preferred;
+                        const utterance = new SpeechSynthesisUtterance(trimmed);
+                        if (widgetVoice) utterance.voice = widgetVoice;
                         utterance.rate = 1.05;
                         utterance.pitch = 1.05;
                         utterance.onend = resolve;
@@ -228,16 +245,9 @@
                 }
             };
 
-            synth.cancel();
             speakSequentially();
         }
     });
-
-    // Proactive voice loading for the parent
-    if (window.speechSynthesis.onvoiceschanged !== undefined) {
-        window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
-    }
-    window.speechSynthesis.getVoices();
 
 })();
 

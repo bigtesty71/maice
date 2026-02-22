@@ -172,6 +172,8 @@
     const API = '';
     let isProcessing = false;
     let pendingImage = null;
+    let isUserWantsToListen = false; // Added to fix ReferenceError
+    let isSpeechSuppressed = false; // Added for completeness based on usage
 
     // Detect Widget Mode
     const urlParams = new URLSearchParams(window.location.search);
@@ -287,11 +289,8 @@
       isProcessing = true;
       document.getElementById('send-btn').disabled = true;
 
-      // Suppress STT while thinking/speaking
-      if (isUserWantsToListen && recognition) {
-        isSpeechSuppressed = true;
-        if (isBrowserListening) recognition.abort();
-      }
+      // Pause mic while processing
+      pauseMicForTTS();
 
       input.value = '';
 
@@ -346,15 +345,10 @@
         document.getElementById('footer-status').textContent = 'Ready';
         input.focus();
 
-        // Release suppression if TTS isn't going to handle it
-        setTimeout(() => {
-          if (!window.speechSynthesis.speaking) {
-            isSpeechSuppressed = false;
-            if (isUserWantsToListen && !isBrowserListening) {
-              try { recognition?.start(); } catch (e) { }
-            }
-          }
-        }, 300);
+        // Resume mic after processing (TTS speakText handles its own resume)
+        if (!isSpeaking) {
+          resumeMicIfNeeded();
+        }
       }
     }
 
@@ -444,10 +438,30 @@
     });
 
     // ═══════════════════════════
-    // TEXT-TO-SPEECH (TTS)
+    // TEXT-TO-SPEECH (TTS) — Clean Web Speech API
     // ═══════════════════════════
     let isTTSActive = true;
-    let currentAudio = null;
+    let isSpeaking = false;
+    let selectedVoice = null;
+
+    // Pre-load voices (Chrome loads them async)
+    function loadVoices() {
+      const voices = window.speechSynthesis.getVoices();
+      if (voices.length === 0) return;
+      // Pick best voice: Zira > Google UK English Female > any Female > en-US fallback
+      selectedVoice =
+        voices.find(v => v.name.includes('Zira')) ||
+        voices.find(v => v.name.includes('Google UK English Female')) ||
+        voices.find(v => v.name.toLowerCase().includes('female') && v.lang.startsWith('en')) ||
+        voices.find(v => v.lang === 'en-US') ||
+        voices[0];
+      console.log('[TTS] Voice selected:', selectedVoice?.name || 'default');
+    }
+    // Chrome fires onvoiceschanged, Firefox/Edge may have them ready immediately
+    if (window.speechSynthesis) {
+      loadVoices();
+      window.speechSynthesis.onvoiceschanged = loadVoices;
+    }
 
     function toggleTTS() {
       isTTSActive = !isTTSActive;
@@ -458,96 +472,104 @@
       } else {
         btn.textContent = '🔇 OFF';
         btn.style.opacity = '0.5';
-        if (currentAudio) {
-          currentAudio.pause();
-          currentAudio = null;
-        }
+        window.speechSynthesis.cancel();
+        isSpeaking = false;
+        resumeMicIfNeeded();
       }
+    }
+
+    function cleanTextForSpeech(text) {
+      let clean = text;
+      clean = clean.replace(/```[\s\S]*?```/g, ' code block ');
+      clean = clean.replace(/`([^`]+)`/g, '$1');
+      clean = clean.replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1');
+      clean = clean.replace(/[\*\_]{1,3}([^\*\_]+)[\*\_]{1,3}/g, '$1');
+      clean = clean.replace(/#{1,6}\s*/g, '');
+      clean = clean.replace(/[->\+\|]/g, '');
+      clean = clean.replace(/\n{2,}/g, '. ');
+      clean = clean.replace(/\s{2,}/g, ' ');
+      return clean.trim();
     }
 
     async function speakText(text) {
       if (!isTTSActive) return;
 
-      // If in widget mode, try to send to parent first (better for cross-origin iframes)
+      // Widget mode: delegate to parent window
       if (window.parent !== window) {
         window.parent.postMessage({ type: 'MAGGIE_SPEAK', text }, '*');
-        // In widget mode, we rely on parent's speech engine
         return;
       }
 
-      isSpeechSuppressed = true;
-      if (isBrowserListening) recognition?.abort();
-
       const synth = window.speechSynthesis;
+      if (!synth) return;
+
+      // Pause mic while MAGGIE speaks
+      pauseMicForTTS();
+
       synth.cancel();
+      isSpeaking = true;
 
-      let clean = text.replace(/```[\s\S]*?```/g, " [Code block] ");
-      clean = clean.replace(/`([^`]+)`/g, "$1");
-      clean = clean.replace(/\[([^\]]+)\]\([^\)]+\)/g, "$1");
-      clean = clean.replace(/[\*\_]{1,3}([^\*\_]+)[\*\_]{1,3}/g, "$1");
-      clean = clean.replace(/[#\-\>\+]/g, "");
+      const clean = cleanTextForSpeech(text);
+      if (!clean) { isSpeaking = false; resumeMicIfNeeded(); return; }
 
+      // Split into sentences for reliable playback (Chrome has a ~15s utterance limit)
       const chunks = clean.match(/[^.!?]+[.!?]*/g) || [clean];
 
-      const speakChunk = (chunk) => {
-        return new Promise((resolve) => {
-          const utterance = new SpeechSynthesisUtterance(chunk.trim());
-          const voices = synth.getVoices();
+      for (const chunk of chunks) {
+        if (!isTTSActive || !isSpeaking) break;
+        const trimmed = chunk.trim();
+        if (!trimmed) continue;
 
-          // Preferred MAGGIE voice (Zira, Google UK Female, or any pleasant female voice)
-          const preferred = voices.find(v => v.name.includes('Zira')) ||
-            voices.find(v => v.name.includes('Google UK English Female')) ||
-            voices.find(v => v.name.includes('Female')) ||
-            voices.find(v => v.lang === 'en-US');
-
-          if (preferred) utterance.voice = preferred;
+        await new Promise((resolve) => {
+          const utterance = new SpeechSynthesisUtterance(trimmed);
+          if (selectedVoice) utterance.voice = selectedVoice;
           utterance.rate = 1.05;
           utterance.pitch = 1.05;
-
           utterance.onend = resolve;
-          utterance.onerror = (err) => {
-            console.error('[TTS Chunk Error]', err);
-            resolve();
-          };
+          utterance.onerror = () => resolve();
+
+          // Chrome bug workaround: long utterances silently stop
+          // Keep-alive by pausing/resuming every 10s
+          let keepAlive = null;
+          if (trimmed.length > 100) {
+            keepAlive = setInterval(() => {
+              if (synth.speaking && !synth.paused) {
+                synth.pause();
+                synth.resume();
+              }
+            }, 10000);
+          }
+          utterance.addEventListener('end', () => clearInterval(keepAlive));
+          utterance.addEventListener('error', () => clearInterval(keepAlive));
 
           synth.speak(utterance);
         });
-      };
-
-      try {
-        for (const chunk of chunks) {
-          if (!isTTSActive) break;
-          await speakChunk(chunk);
-        }
-      } catch (err) {
-        console.error('[TTS Error]', err);
-      } finally {
-        isSpeechSuppressed = false;
-        if (isUserWantsToListen && !isBrowserListening && isTTSActive) {
-          try { recognition?.start(); } catch (e) { }
-        }
       }
+
+      isSpeaking = false;
+      resumeMicIfNeeded();
     }
 
     // ═══════════════════════════
-    // SPEECH-TO-TEXT (STT) - SIMPLIFIED
+    // SPEECH-TO-TEXT (STT) — Mic Input
     // ═══════════════════════════
     let recognition = null;
     let isBrowserListening = false;
 
     function initSpeech() {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (!SpeechRecognition) {
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SR) {
         const micBtn = document.getElementById('mic-btn');
         if (micBtn) {
-          micBtn.title = 'Speech not supported in this browser';
+          micBtn.title = 'Speech not supported — use Chrome or Edge';
           micBtn.style.opacity = '0.3';
-          micBtn.onclick = () => alert('Speech recognition is not supported in this browser. Please use Chrome or Edge.');
+          micBtn.onclick = () => alert('Speech recognition requires Chrome or Edge.');
         }
+        console.warn('[STT] SpeechRecognition API not available.');
         return;
       }
 
-      recognition = new SpeechRecognition();
+      recognition = new SR();
       recognition.continuous = true;
       recognition.interimResults = true;
       recognition.lang = 'en-US';
@@ -555,30 +577,42 @@
       recognition.onstart = () => {
         isBrowserListening = true;
         document.getElementById('mic-btn')?.classList.add('recording');
-        const status = document.getElementById('footer-status');
-        if (status) status.textContent = 'Listening...';
+        const s = document.getElementById('footer-status');
+        if (s) s.textContent = 'Listening...';
+        console.log('[STT] Mic active.');
       };
 
       recognition.onresult = (event) => {
-        let fullTranscript = '';
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          fullTranscript += event.results[i][0].transcript;
+        let transcript = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript;
         }
         const input = document.getElementById('user-input');
-        if (input) input.value = fullTranscript;
+        if (input) input.value = transcript;
       };
 
       recognition.onerror = (event) => {
-        console.error('[STT Error]', event.error);
-        if (event.error === 'not-allowed') alert('Microphone access denied.');
-        stopRecording();
+        console.error('[STT] Error:', event.error);
+        // Only alert on permission denial, not transient errors
+        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+          alert('Microphone access denied. Please allow mic access in your browser settings.');
+        }
+        // aborted errors are expected during TTS suppression — ignore
+        if (event.error !== 'aborted' && event.error !== 'no-speech') {
+          stopRecording();
+        }
       };
 
       recognition.onend = () => {
         isBrowserListening = false;
         document.getElementById('mic-btn')?.classList.remove('recording');
-        const status = document.getElementById('footer-status');
-        if (status) status.textContent = 'Ready';
+        const s = document.getElementById('footer-status');
+        if (s && !isSpeaking) s.textContent = 'Ready';
+
+        // Auto-restart if user wants to keep listening and we're not in TTS
+        if (isUserWantsToListen && !isSpeechSuppressed && !isSpeaking) {
+          try { recognition.start(); } catch (e) { /* already running or destroyed */ }
+        }
       };
     }
 
@@ -587,25 +621,50 @@
       if (!recognition) return;
 
       if (isBrowserListening) {
+        // User is turning OFF the mic
+        isUserWantsToListen = false;
+        isSpeechSuppressed = false;
         stopRecording();
       } else {
+        // User is turning ON the mic
+        isUserWantsToListen = true;
+        isSpeechSuppressed = false;
         try {
           recognition.start();
         } catch (e) {
-          console.error('[STT] Start failed', e);
+          console.error('[STT] Start failed:', e);
+          // If already started, stop and restart
+          try { recognition.stop(); } catch (_) { }
+          setTimeout(() => {
+            try { recognition.start(); } catch (_) { }
+          }, 200);
         }
       }
     }
 
     function stopRecording() {
       if (recognition) {
-        try {
-          recognition.stop();
-          recognition.abort(); // Force hardware release
-        } catch (e) { }
+        try { recognition.stop(); } catch (e) { }
       }
       isBrowserListening = false;
       document.getElementById('mic-btn')?.classList.remove('recording');
+    }
+
+    // --- Mic ↔ TTS coordination ---
+    function pauseMicForTTS() {
+      isSpeechSuppressed = true;
+      if (isBrowserListening && recognition) {
+        try { recognition.abort(); } catch (e) { }
+      }
+    }
+
+    function resumeMicIfNeeded() {
+      isSpeechSuppressed = false;
+      if (isUserWantsToListen && !isBrowserListening && recognition) {
+        setTimeout(() => {
+          try { recognition.start(); } catch (e) { }
+        }, 300);
+      }
     }
 
 
