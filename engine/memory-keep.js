@@ -639,7 +639,15 @@ class MemoryKeepEngine {
 
   /** ANALYZE — Analyze the knowledge graph for insights */
   async toolAnalyze() {
-    const stats = await this.getGraphStats();
+    let stats;
+    try {
+      stats = await this.getGraphStats();
+    } catch (err) {
+      console.warn('[Tool:ANALYZE] DB Timeout fallback engaged.');
+      // Fallback: Read from the last stream snapshot if DB is flaky
+      return `[ANALYZE FALLBACK] Knowledge Graph (SQL) is currently High-Latency. Analyzing active Stream buffer instead: I see ${this.stream.length} active nodes in current consciousness. The immediate thread is focused on ${this.stream.slice(-2).map(m => m.content.slice(0, 30)).join(' & ')}.`;
+    }
+
     if (stats.nodeCount === 0) return 'The knowledge graph is empty. Talk more to build connections.';
 
     const nodesStr = stats.topNodes.map(n => `${n.label} (${n.type}, strength: ${n.strength})`).join(', ');
@@ -980,16 +988,27 @@ class MemoryKeepEngine {
    */
   async getGraphStats() {
     await this.dbReady;
-    const [[nodeRow]] = await this.pool.execute('SELECT COUNT(*) as count FROM graph_nodes');
-    const [[edgeRow]] = await this.pool.execute('SELECT COUNT(*) as count FROM graph_edges');
-    const [topNodes] = await this.pool.execute(
-      'SELECT label, type, strength FROM graph_nodes ORDER BY strength DESC LIMIT 8'
-    );
-    const [recentEdges] = await this.pool.execute(
-      'SELECT source_label, target_label, relationship FROM graph_edges ORDER BY timestamp DESC LIMIT 5'
-    );
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('ETIMEDOUT')), 5000));
 
-    return { nodeCount: nodeRow.count, edgeCount: edgeRow.count, topNodes, recentEdges };
+    return Promise.race([
+      (async () => {
+        const [[nodeRow]] = await this.pool.execute('SELECT COUNT(*) as count FROM graph_nodes');
+        const [[edgeRow]] = await this.pool.execute('SELECT COUNT(*) as count FROM graph_edges');
+        const [topNodes] = await this.pool.execute(
+          'SELECT label, type, strength FROM graph_nodes ORDER BY strength DESC LIMIT 8'
+        );
+        const [recentEdges] = await this.pool.execute(
+          'SELECT source_label, target_label, relationship FROM graph_edges ORDER BY timestamp DESC LIMIT 5'
+        );
+        return {
+          nodeCount: nodeRow.count,
+          edgeCount: edgeRow.count,
+          topNodes,
+          recentEdges
+        };
+      })(),
+      timeoutPromise
+    ]);
   }
 
   // =========================================================================
@@ -1568,15 +1587,22 @@ Respond with tool calls OR a brief internal thought to remember.`
         const TOOL_NAMES = ['SEARCH', 'REMEMBER', 'TASK_ADD', 'ANALYZE', 'BROWSE', 'EMAIL', 'TELEGRAM', 'WRITE', 'READ', 'LIST_FILES'];
         let rounds = 0;
         while (rounds < 2) {
+          // Robust block-based tool extractor
           const toolCalls = [];
-          for (const line of heartbeatReply.split('\n')) {
-            const trimmed = line.trim();
-            for (const tool of TOOL_NAMES) {
-              if (trimmed.startsWith(`${tool}:`)) {
-                toolCalls.push({ tool, args: trimmed.slice(tool.length + 1).trim() });
-              }
-            }
+          const pattern = new RegExp(`(${TOOL_NAMES.join('|')}):`, 'g');
+          const matches = [];
+          let m;
+          while ((m = pattern.exec(heartbeatReply)) !== null) {
+            matches.push({ tool: m[1], index: m.index });
           }
+
+          for (let i = 0; i < matches.length; i++) {
+            const start = matches[i].index + matches[i].tool.length + 1;
+            const end = (i + 1 < matches.length) ? matches[i + 1].index : heartbeatReply.length;
+            const args = heartbeatReply.slice(start, end).trim();
+            toolCalls.push({ tool: matches[i].tool, args });
+          }
+
           if (toolCalls.length === 0) break;
 
           for (const tc of toolCalls) {
