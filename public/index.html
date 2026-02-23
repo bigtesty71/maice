@@ -106,758 +106,766 @@
         </div>
       </div>
 
-      <!-- Keep in Touch -->
-      <div class="widget">
-        <div class="widget-title">Keep in Touch</div>
-        <div class="email-collect-card">
-          <input type="text" id="collect-name" placeholder="Name">
-          <input type="email" id="collect-email" placeholder="Email" required>
-          <button onclick="submitEmail()" class="action-btn" style="width:100%; margin-top:10px;">Connect</button>
-          <div id="collect-status" style="font-size: 0.7rem; margin-top: 8px; text-align: center;"></div>
+
+
+      <div class="sidebar-footer">
+        USER: JEWELLS | <span class="neural-pulse"></span>SESSION STABLE
+      </div>
+    </div>
+
+    <!-- ═══ MAIN CONTENT ═══ -->
+    <div class="main-content">
+      <div class="header">
+        <div class="header-label">
+          PROTOCOL: <span class="active">NEURAL-KEEP (AGENTIC)</span> · MAGGIE ENGINE
+        </div>
+        <div class="header-actions">
+          <button id="metrics-btn" class="action-btn" onclick="toggleMetrics()" title="Neural Metrics">🧠 STATS</button>
+          <button id="tts-toggle" onclick="toggleTTS()" class="action-btn" title="Toggle Voice">🔈 ON</button>
+          <button onclick="copyHistory()" class="action-btn">COPY LOGS</button>
+
+        </div>
+      </div>
+
+      <!-- Metrics Overlay (for Widget Mode) -->
+      <div id="metrics-overlay" class="metrics-overlay">
+        <div class="metrics-header">
+          <span>NEURAL STATUS</span>
+          <button onclick="toggleMetrics()">✕</button>
+        </div>
+        <div id="metrics-content">
+          <!-- Cloned from sidebar widgets via JS -->
+        </div>
+
+      </div>
+
+      <div id="chat-container">
+        <div class="message system-note">MAGGIE Neural Bridge Connected. MemoryKeep v3 + Graph + Vision + Email +
+          Browser
+          +
+          Telegram Active. 11 agentic tools online. Heartbeat engaged.</div>
+      </div>
+
+      <div class="input-wrapper">
+        <div id="keep-in-touch-gate"
+          style="display: block; background: var(--surface); border: 1px solid var(--neon-cyan); padding: 15px; border-radius: 12px; text-align: center; margin-bottom: 5px;">
+          <p style="margin-bottom: 12px; font-size: 0.85rem; color: var(--text-dim);">Please identify yourself to
+            establish a Neural Link.</p>
+          <div
+            style="display: flex; gap: 8px; justify-content: center; max-width: 400px; margin: 0 auto; flex-wrap: wrap;">
+            <input type="text" id="collect-name" placeholder="Name"
+              style="flex: 1; min-width: 100px; padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.3); color: white;">
+            <input type="email" id="collect-email" placeholder="Email" required
+              style="flex: 1; min-width: 100px; padding: 10px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.3); color: white;">
+            <button onclick="submitEmail()" class="action-btn"
+              style="background: var(--neon-cyan); color: #fff; padding: 0 16px;">CONNECT</button>
+          </div>
+          <div id="collect-status"
+            style="font-size: 0.75rem; margin-top: 10px; text-align: center; color: var(--neon-orange);"></div>
+        </div>
+
+        <div class="input-container" id="chat-input-container" style="display: none;">
+          <input id="image-upload" type="file" accept="image/*" style="display:none"
+            onchange="handleImageSelect(event)">
+          <button class="upload-btn" onclick="document.getElementById('image-upload').click()"
+            title="Upload image for vision">📷</button>
+          <button id="mic-btn" class="mic-btn" onclick="toggleMic()" title="Speech-to-text">🎙️</button>
+          <input id="user-input" type="text" placeholder="Transceive input..." autocomplete="off">
+          <button id="send-btn" onclick="handleSend()" class="send-btn">SEND</button>
+        </div>
+        <div id="image-preview-container" style="padding: 0 4px;"></div>
+        <div class="input-footer">
+          <span>MAGGIE · Memory-Augmented Graph-Guided Intelligent Entity</span>
+          <span id="footer-status">Ready</span>
         </div>
       </div>
     </div>
 
-    <div class="sidebar-footer">
-      USER: JEWELLS | <span class="neural-pulse"></span>SESSION STABLE
-    </div>
-  </div>
+    <script>
+      const API = '';
+      let isProcessing = false;
+      let pendingImage = null;
+      let isUserWantsToListen = false;
+      let isSpeechSuppressed = false;
+      let currentUser = null;
 
-  <!-- ═══ MAIN CONTENT ═══ -->
-  <div class="main-content">
-    <div class="header">
-      <div class="header-label">
-        PROTOCOL: <span class="active">NEURAL-KEEP (AGENTIC)</span> · MAGGIE ENGINE
-      </div>
-      <div class="header-actions">
-        <button id="metrics-btn" class="action-btn" onclick="toggleMetrics()" title="Neural Metrics">🧠 STATS</button>
-        <button id="tts-toggle" onclick="toggleTTS()" class="action-btn" title="Toggle Voice">🔈 ON</button>
-        <button onclick="copyHistory()" class="action-btn">COPY LOGS</button>
+      // --- Visitor Recognition ---
+      let visitorToken = localStorage.getItem('maggie_visitor_token') || null;
 
-      </div>
-    </div>
+      // Detect Widget Mode
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.has('widget') || window.self !== window.top) {
+        document.body.classList.add('is-widget');
+        console.log('[MAGGIE] Widget mode active.');
+      }
+      // ═══════════════════════════
+      // STATUS POLLING
+      // ═══════════════════════════
+      async function updateStatus() {
+        try {
+          const res = await fetch(`${API}/status`);
+          const data = await res.json();
 
-    <!-- Metrics Overlay (for Widget Mode) -->
-    <div id="metrics-overlay" class="metrics-overlay">
-      <div class="metrics-header">
-        <span>NEURAL STATUS</span>
-        <button onclick="toggleMetrics()">✕</button>
-      </div>
-      <div id="metrics-content">
-        <!-- Cloned from sidebar widgets via JS -->
-      </div>
+          document.querySelectorAll('#exp-val').forEach(el => el.textContent = data.experience_count || 0);
+          document.querySelectorAll('#dom-val').forEach(el => el.textContent = data.domain_count || 0);
 
-    </div>
+          // Context gauge
+          const pct = data.context_cap
+            ? Math.round((data.stream_tokens / data.context_cap) * 100)
+            : 0;
+          document.querySelectorAll('#ctx-pct').forEach(el => el.textContent = pct + '%');
+          document.querySelectorAll('#ctx-fill').forEach(fill => {
+            fill.style.width = pct + '%';
+            fill.className = 'gauge-fill' + (pct > 70 ? ' warning' : '');
+          });
 
-    <div id="chat-container">
-      <div class="message system-note">MAGGIE Neural Bridge Connected. MemoryKeep v3 + Graph + Vision + Email + Browser
-        +
-        Telegram Active. 11 agentic tools online. Heartbeat engaged.</div>
-    </div>
+          // Sifter reports
+          if (data.sifter_patterns && data.sifter_patterns.length > 0) {
+            const html = data.sifter_patterns
+              .map(p => `<div class="report-item">${escapeHtml(p.content)}</div>`)
+              .join('');
+            document.querySelectorAll('#reports').forEach(el => el.innerHTML = html);
+          }
 
-    <div class="input-wrapper">
-      <div class="input-container">
-        <input id="image-upload" type="file" accept="image/*" style="display:none" onchange="handleImageSelect(event)">
-        <button class="upload-btn" onclick="document.getElementById('image-upload').click()"
-          title="Upload image for vision">📷</button>
-        <button id="mic-btn" class="mic-btn" onclick="toggleMic()" title="Speech-to-text">🎙️</button>
-        <input id="user-input" type="text" placeholder="Transceive input..." autocomplete="off">
-        <button id="send-btn" onclick="handleSend()" class="send-btn">SEND</button>
-      </div>
-      <div id="image-preview-container" style="padding: 0 4px;"></div>
-      <div class="input-footer">
-        <span>MAGGIE · Memory-Augmented Graph-Guided Intelligent Entity</span>
-        <span id="footer-status">Ready</span>
-      </div>
-    </div>
-  </div>
+          // Intake feed
+          if (data.recent_experiences && data.recent_experiences.length > 0) {
+            const html = data.recent_experiences
+              .map(e => {
+                const ts = e.timestamp ? e.timestamp.split(' ')[1] || '' : '';
+                return `<div class="activity-line"><span class="ts">${ts}</span> ${escapeHtml(e.content)}</div>`;
+              }).join('');
+            document.querySelectorAll('#activity').forEach(el => el.innerHTML = html);
+          }
 
-  <script>
-    const API = '';
-    let isProcessing = false;
-    let pendingImage = null;
-    let isUserWantsToListen = false;
-    let isSpeechSuppressed = false;
-    let currentUser = null;
+          // Graph memory
+          document.querySelectorAll('#graph-nodes-val').forEach(el => el.textContent = data.graph_nodes || 0);
+          document.querySelectorAll('#graph-edges-val').forEach(el => el.textContent = data.graph_edges || 0);
 
-    // --- Visitor Recognition ---
-    let visitorToken = localStorage.getItem('maggie_visitor_token') || null;
+          // Connection Status
+          const statusEl = document.getElementById('footer-status');
+          const modeText = data.bot_mode || 'Stable';
+          if (currentUser && currentUser.recognized) {
+            statusEl.textContent = `System: ${currentUser.name} | ${modeText}`;
+          } else {
+            statusEl.textContent = modeText;
+          }
 
-    // Detect Widget Mode
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.has('widget') || window.self !== window.top) {
-      document.body.classList.add('is-widget');
-      console.log('[MAGGIE] Widget mode active.');
-    }
-    // ═══════════════════════════
-    // STATUS POLLING
-    // ═══════════════════════════
-    async function updateStatus() {
-      try {
-        const res = await fetch(`${API}/status`);
-        const data = await res.json();
+          if (data.graph_top_nodes && data.graph_top_nodes.length > 0) {
+            document.querySelectorAll('#graph-empty').forEach(el => el.style.display = 'none');
+            const html = data.graph_top_nodes
+              .map(n => `<span class="graph-node-tag">${escapeHtml(n.label)} <span class="strength">${n.strength}</span></span>`)
+              .join('');
+            document.querySelectorAll('#graph-nodes-display').forEach(el => el.innerHTML = html);
+          } else {
+            document.querySelectorAll('#graph-empty').forEach(el => el.style.display = 'block');
+            document.querySelectorAll('#graph-nodes-display').forEach(el => el.innerHTML = '');
+          }
 
-        document.querySelectorAll('#exp-val').forEach(el => el.textContent = data.experience_count || 0);
-        document.querySelectorAll('#dom-val').forEach(el => el.textContent = data.domain_count || 0);
-
-        // Context gauge
-        const pct = data.context_cap
-          ? Math.round((data.stream_tokens / data.context_cap) * 100)
-          : 0;
-        document.querySelectorAll('#ctx-pct').forEach(el => el.textContent = pct + '%');
-        document.querySelectorAll('#ctx-fill').forEach(fill => {
-          fill.style.width = pct + '%';
-          fill.className = 'gauge-fill' + (pct > 70 ? ' warning' : '');
-        });
-
-        // Sifter reports
-        if (data.sifter_patterns && data.sifter_patterns.length > 0) {
-          const html = data.sifter_patterns
-            .map(p => `<div class="report-item">${escapeHtml(p.content)}</div>`)
-            .join('');
-          document.querySelectorAll('#reports').forEach(el => el.innerHTML = html);
-        }
-
-        // Intake feed
-        if (data.recent_experiences && data.recent_experiences.length > 0) {
-          const html = data.recent_experiences
-            .map(e => {
-              const ts = e.timestamp ? e.timestamp.split(' ')[1] || '' : '';
-              return `<div class="activity-line"><span class="ts">${ts}</span> ${escapeHtml(e.content)}</div>`;
-            }).join('');
-          document.querySelectorAll('#activity').forEach(el => el.innerHTML = html);
-        }
-
-        // Graph memory
-        document.querySelectorAll('#graph-nodes-val').forEach(el => el.textContent = data.graph_nodes || 0);
-        document.querySelectorAll('#graph-edges-val').forEach(el => el.textContent = data.graph_edges || 0);
-
-        // Connection Status
-        const statusEl = document.getElementById('footer-status');
-        const modeText = data.bot_mode || 'Stable';
-        if (currentUser && currentUser.recognized) {
-          statusEl.textContent = `System: ${currentUser.name} | ${modeText}`;
-        } else {
-          statusEl.textContent = modeText;
-        }
-
-        if (data.graph_top_nodes && data.graph_top_nodes.length > 0) {
-          document.querySelectorAll('#graph-empty').forEach(el => el.style.display = 'none');
-          const html = data.graph_top_nodes
-            .map(n => `<span class="graph-node-tag">${escapeHtml(n.label)} <span class="strength">${n.strength}</span></span>`)
-            .join('');
-          document.querySelectorAll('#graph-nodes-display').forEach(el => el.innerHTML = html);
-        } else {
-          document.querySelectorAll('#graph-empty').forEach(el => el.style.display = 'block');
-          document.querySelectorAll('#graph-nodes-display').forEach(el => el.innerHTML = '');
-        }
-
-        if (data.graph_recent_edges && data.graph_recent_edges.length > 0) {
-          const html = data.graph_recent_edges
-            .map(e => `<div class="graph-edge">${escapeHtml(e.source_label)} <span class="rel">—[${escapeHtml(e.relationship)}]→</span> ${escapeHtml(e.target_label)}</div>`)
-            .join('');
-          document.querySelectorAll('#graph-edges-display').forEach(el => el.innerHTML = html);
-        } else {
-          document.querySelectorAll('#graph-edges-display').forEach(el => el.innerHTML = '');
-        }
-        // Task tracker
-        if (data.tasks_pending !== undefined) {
-          const html = `Pending: <span>${data.tasks_pending}</span> · Done: <span>${data.tasks_done}</span>`;
-          document.querySelectorAll('#task-stats').forEach(el => el.innerHTML = html);
-        }
-        if (data.tasks_recent && data.tasks_recent.length > 0) {
-          const html = data.tasks_recent
-            .map(t => {
-              const isDone = t.status === 'done';
-              return `<div class="task-item${isDone ? ' done' : ''}">
+          if (data.graph_recent_edges && data.graph_recent_edges.length > 0) {
+            const html = data.graph_recent_edges
+              .map(e => `<div class="graph-edge">${escapeHtml(e.source_label)} <span class="rel">—[${escapeHtml(e.relationship)}]→</span> ${escapeHtml(e.target_label)}</div>`)
+              .join('');
+            document.querySelectorAll('#graph-edges-display').forEach(el => el.innerHTML = html);
+          } else {
+            document.querySelectorAll('#graph-edges-display').forEach(el => el.innerHTML = '');
+          }
+          // Task tracker
+          if (data.tasks_pending !== undefined) {
+            const html = `Pending: <span>${data.tasks_pending}</span> · Done: <span>${data.tasks_done}</span>`;
+            document.querySelectorAll('#task-stats').forEach(el => el.innerHTML = html);
+          }
+          if (data.tasks_recent && data.tasks_recent.length > 0) {
+            const html = data.tasks_recent
+              .map(t => {
+                const isDone = t.status === 'done';
+                return `<div class="task-item${isDone ? ' done' : ''}">
                 <span class="task-badge ${isDone ? 'complete' : 'pending'}">${isDone ? '✓' : '#' + t.id}</span>
                 ${escapeHtml(t.description)}
               </div>`;
-            }).join('');
-          document.querySelectorAll('#task-list').forEach(el => el.innerHTML = html);
+              }).join('');
+            document.querySelectorAll('#task-list').forEach(el => el.innerHTML = html);
+          }
+        } catch {
+          document.querySelector('.header-label').innerHTML =
+            'PROTOCOL: <span style="color: #ff0e59">LINK LOST</span>';
         }
-      } catch {
-        document.querySelector('.header-label').innerHTML =
-          'PROTOCOL: <span style="color: #ff0e59">LINK LOST</span>';
       }
-    }
 
-    // ═══════════════════════════
-    // SEND MESSAGE
-    // ═══════════════════════════
-    function handleImageSelect(event) {
-      const file = event.target.files[0];
-      if (!file) return;
+      // ═══════════════════════════
+      // SEND MESSAGE
+      // ═══════════════════════════
+      function handleImageSelect(event) {
+        const file = event.target.files[0];
+        if (!file) return;
 
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        pendingImage = e.target.result; // data:image/...;base64,...
-        document.getElementById('image-preview-container').innerHTML =
-          `<img src="${pendingImage}" class="image-preview"> <button onclick="clearImage()" style="background:none;border:none;color:var(--neon-orange);cursor:pointer;font-size:0.8rem;">✕ Remove</button>`;
-      };
-      reader.readAsDataURL(file);
-    }
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          pendingImage = e.target.result; // data:image/...;base64,...
+          document.getElementById('image-preview-container').innerHTML =
+            `<img src="${pendingImage}" class="image-preview"> <button onclick="clearImage()" style="background:none;border:none;color:var(--neon-orange);cursor:pointer;font-size:0.8rem;">✕ Remove</button>`;
+        };
+        reader.readAsDataURL(file);
+      }
 
-    function clearImage() {
-      pendingImage = null;
-      document.getElementById('image-preview-container').innerHTML = '';
-      document.getElementById('image-upload').value = '';
-    }
+      function clearImage() {
+        pendingImage = null;
+        document.getElementById('image-preview-container').innerHTML = '';
+        document.getElementById('image-upload').value = '';
+      }
 
-    async function handleSend() {
-      const input = document.getElementById('user-input');
-      const text = input.value.trim();
-      if ((!text && !pendingImage) || isProcessing) return;
+      async function handleSend() {
+        const input = document.getElementById('user-input');
+        const text = input.value.trim();
+        if ((!text && !pendingImage) || isProcessing) return;
 
-      isProcessing = true;
-      document.getElementById('send-btn').disabled = true;
+        isProcessing = true;
+        document.getElementById('send-btn').disabled = true;
 
-      // Pause mic while processing
-      pauseMicForTTS();
+        // Pause mic while processing
+        pauseMicForTTS();
 
-      input.value = '';
+        input.value = '';
 
-      // Show user message
-      const displayText = pendingImage ? `📷 ${text || 'What do you see?'}` : text;
-      renderMessage(displayText, 'user');
+        // Show user message
+        const displayText = pendingImage ? `📷 ${text || 'What do you see?'}` : text;
+        renderMessage(displayText, 'user');
 
-      // Show image preview in chat if attached
-      if (pendingImage) {
+        // Show image preview in chat if attached
+        if (pendingImage) {
+          const container = document.getElementById('chat-container');
+          const imgDiv = document.createElement('div');
+          imgDiv.className = 'message user';
+          imgDiv.innerHTML = `<img src="${pendingImage}" style="max-width:300px;border-radius:8px;">`;
+          container.appendChild(imgDiv);
+          container.scrollTop = container.scrollHeight;
+        }
+
+        document.getElementById('footer-status').textContent = pendingImage ? 'Analyzing image...' : 'Thinking...';
+
+        // Typing indicator
+        const thinkingId = 'ai-thinking-' + Date.now();
+        addTyping(thinkingId);
+
+        try {
+          const headers = { 'Content-Type': 'application/json' };
+          if (visitorToken) headers['x-visitor-token'] = visitorToken;
+
+          let data;
+          if (pendingImage) {
+            const res = await fetch(`${API}/vision`, {
+              method: 'POST',
+              headers: headers,
+              body: JSON.stringify({ image: pendingImage, message: text || 'What do you see?' })
+            });
+            data = await res.json();
+            clearImage();
+          } else {
+            const res = await fetch(`${API}/chat`, {
+              method: 'POST',
+              headers: headers,
+              body: JSON.stringify({ message: text })
+            });
+            data = await res.json();
+          }
+
+          removeElement(thinkingId);
+          renderMessage(data.reply || data.error || 'No signal.', 'ai');
+          updateStatus();
+        } catch (err) {
+          removeElement(thinkingId);
+          addMessage(`⚠ Error: ${err.message}`, 'ai');
+        } finally {
+          isProcessing = false;
+          document.getElementById('send-btn').disabled = false;
+          document.getElementById('footer-status').textContent = 'Ready';
+          input.focus();
+
+          // Resume mic after processing (TTS speakText handles its own resume)
+          if (!isSpeaking) {
+            resumeMicIfNeeded();
+          }
+        }
+      }
+
+      // ═══════════════════════════
+      // MESSAGE RENDERING
+      // ═══════════════════════════
+      function addMessage(text, role) {
         const container = document.getElementById('chat-container');
-        const imgDiv = document.createElement('div');
-        imgDiv.className = 'message user';
-        imgDiv.innerHTML = `<img src="${pendingImage}" style="max-width:300px;border-radius:8px;">`;
-        container.appendChild(imgDiv);
+        const div = document.createElement('div');
+        div.className = `message ${role}`;
+        div.innerHTML = role === 'ai' ? marked.parse(text) : escapeHtml(text);
+        container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
+
+        // TTS: Speak if it's AI, not muted, and not an error
+        if (role === 'ai' && isTTSActive && !text.includes('⚠ Error')) {
+          speakText(text);
+        }
+
+        // --- NEW: Client-Side Persistence ---
+        saveChatToCache();
+      }
+
+      function addTyping(id) {
+        const container = document.getElementById('chat-container');
+        const div = document.createElement('div');
+        div.className = 'message ai';
+        div.id = id;
+        div.innerHTML = '<div class="typing-dots"><span></span><span></span><span></span></div>';
+        container.appendChild(div);
         container.scrollTop = container.scrollHeight;
       }
 
-      document.getElementById('footer-status').textContent = pendingImage ? 'Analyzing image...' : 'Thinking...';
-
-      // Typing indicator
-      const thinkingId = 'ai-thinking-' + Date.now();
-      addTyping(thinkingId);
-
-      try {
-        const headers = { 'Content-Type': 'application/json' };
-        if (visitorToken) headers['x-visitor-token'] = visitorToken;
-
-        let data;
-        if (pendingImage) {
-          const res = await fetch(`${API}/vision`, {
-            method: 'POST',
-            headers: headers,
-            body: JSON.stringify({ image: pendingImage, message: text || 'What do you see?' })
-          });
-          data = await res.json();
-          clearImage();
-        } else {
-          const res = await fetch(`${API}/chat`, {
-            method: 'POST',
-            headers: headers,
-            body: JSON.stringify({ message: text })
-          });
-          data = await res.json();
-        }
-
-        removeElement(thinkingId);
-        renderMessage(data.reply || data.error || 'No signal.', 'ai');
-        updateStatus();
-      } catch (err) {
-        removeElement(thinkingId);
-        addMessage(`⚠ Error: ${err.message}`, 'ai');
-      } finally {
-        isProcessing = false;
-        document.getElementById('send-btn').disabled = false;
-        document.getElementById('footer-status').textContent = 'Ready';
-        input.focus();
-
-        // Resume mic after processing (TTS speakText handles its own resume)
-        if (!isSpeaking) {
-          resumeMicIfNeeded();
-        }
-      }
-    }
-
-    // ═══════════════════════════
-    // MESSAGE RENDERING
-    // ═══════════════════════════
-    function addMessage(text, role) {
-      const container = document.getElementById('chat-container');
-      const div = document.createElement('div');
-      div.className = `message ${role}`;
-      div.innerHTML = role === 'ai' ? marked.parse(text) : escapeHtml(text);
-      container.appendChild(div);
-      container.scrollTop = container.scrollHeight;
-
-      // TTS: Speak if it's AI, not muted, and not an error
-      if (role === 'ai' && isTTSActive && !text.includes('⚠ Error')) {
-        speakText(text);
+      function removeElement(id) {
+        const el = document.getElementById(id);
+        if (el) el.remove();
       }
 
-      // --- NEW: Client-Side Persistence ---
-      saveChatToCache();
-    }
+      function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+      }
 
-    function addTyping(id) {
-      const container = document.getElementById('chat-container');
-      const div = document.createElement('div');
-      div.className = 'message ai';
-      div.id = id;
-      div.innerHTML = '<div class="typing-dots"><span></span><span></span><span></span></div>';
-      container.appendChild(div);
-      container.scrollTop = container.scrollHeight;
-    }
+      // ═══════════════════════════
+      // HISTORY & ACTIONS
+      // ═══════════════════════════
+      async function loadHistory() {
+        // 1. Try to load from local cache first for instant continuity
+        const cacheKey = visitorToken ? `maggie_cache_${visitorToken}` : 'maggie_cache_anonymous';
+        const cached = localStorage.getItem(cacheKey);
+        let localHistory = [];
+        if (cached) {
+          try {
+            localHistory = JSON.parse(cached);
+            if (localHistory.length > 0) {
+              const container = document.getElementById('chat-container');
+              container.innerHTML = '';
+              localHistory.forEach(m => {
+                if (m.role !== 'system') {
+                  renderMessage(m.content, m.role === 'user' ? 'user' : 'ai', false);
+                }
+              });
+              console.log('[Cache] Restored from local persistence.');
 
-    function removeElement(id) {
-      const el = document.getElementById(id);
-      if (el) el.remove();
-    }
+              // --- NEW: Sync local history back to server ---
+              fetch(`${API}/sync`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ history: localHistory })
+              }).catch(e => console.warn('[Sync] Failed to warm up server stream.'));
+            }
+          } catch (e) { console.warn('[Cache] Corruption detected.'); }
+        }
 
-    function escapeHtml(text) {
-      const div = document.createElement('div');
-      div.textContent = text;
-      return div.innerHTML;
-    }
-
-    // ═══════════════════════════
-    // HISTORY & ACTIONS
-    // ═══════════════════════════
-    async function loadHistory() {
-      // 1. Try to load from local cache first for instant continuity
-      const cacheKey = visitorToken ? `maggie_cache_${visitorToken}` : 'maggie_cache_anonymous';
-      const cached = localStorage.getItem(cacheKey);
-      let localHistory = [];
-      if (cached) {
+        // 2. Then sync with server for truth
         try {
-          localHistory = JSON.parse(cached);
-          if (localHistory.length > 0) {
+          const res = await fetch(`${API}/history`);
+          const data = await res.json();
+          if (data && data.history && data.history.length > 0) {
             const container = document.getElementById('chat-container');
             container.innerHTML = '';
-            localHistory.forEach(m => {
+            data.history.forEach(m => {
               if (m.role !== 'system') {
                 renderMessage(m.content, m.role === 'user' ? 'user' : 'ai', false);
               }
             });
-            console.log('[Cache] Restored from local persistence.');
-
-            // --- NEW: Sync local history back to server ---
-            fetch(`${API}/sync`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ history: localHistory })
-            }).catch(e => console.warn('[Sync] Failed to warm up server stream.'));
+            // Update cache with server truth
+            saveChatToCache();
           }
-        } catch (e) { console.warn('[Cache] Corruption detected.'); }
+        } catch { /* first load */ }
       }
 
-      // 2. Then sync with server for truth
-      try {
-        const res = await fetch(`${API}/history`);
-        const data = await res.json();
-        if (data && data.history && data.history.length > 0) {
-          const container = document.getElementById('chat-container');
-          container.innerHTML = '';
-          data.history.forEach(m => {
-            if (m.role !== 'system') {
-              renderMessage(m.content, m.role === 'user' ? 'user' : 'ai', false);
-            }
-          });
-          // Update cache with server truth
+      function saveChatToCache() {
+        const msgs = Array.from(document.querySelectorAll('.message'))
+          .filter(m => !m.classList.contains('system-note') && !m.id?.startsWith('ai-thinking'))
+          .map(m => ({
+            role: m.classList.contains('user') ? 'user' : 'assistant',
+            content: m.dataset.raw || m.innerText
+          }))
+          .slice(-50); // Keep last 50 for performance
+
+        const cacheKey = visitorToken ? `maggie_cache_${visitorToken}` : 'maggie_cache_anonymous';
+        localStorage.setItem(cacheKey, JSON.stringify(msgs));
+      }
+
+      // Refactored message renderer to support "silent" (no TTS/Cache trigger) re-renders
+      function renderMessage(text, role, shouldTriggerSideEffects = true) {
+        const container = document.getElementById('chat-container');
+        const div = document.createElement('div');
+        div.className = `message ${role}`;
+        div.dataset.raw = text; // Store raw text for caching
+        div.innerHTML = role === 'ai' || role === 'assistant' ? marked.parse(text) : escapeHtml(text);
+        container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
+
+        if (shouldTriggerSideEffects) {
+          if ((role === 'ai' || role === 'assistant') && isTTSActive && !text.includes('⚠ Error')) {
+            speakText(text);
+          }
           saveChatToCache();
         }
-      } catch { /* first load */ }
-    }
-
-    function saveChatToCache() {
-      const msgs = Array.from(document.querySelectorAll('.message'))
-        .filter(m => !m.classList.contains('system-note') && !m.id?.startsWith('ai-thinking'))
-        .map(m => ({
-          role: m.classList.contains('user') ? 'user' : 'assistant',
-          content: m.dataset.raw || m.innerText
-        }))
-        .slice(-50); // Keep last 50 for performance
-
-      const cacheKey = visitorToken ? `maggie_cache_${visitorToken}` : 'maggie_cache_anonymous';
-      localStorage.setItem(cacheKey, JSON.stringify(msgs));
-    }
-
-    // Refactored message renderer to support "silent" (no TTS/Cache trigger) re-renders
-    function renderMessage(text, role, shouldTriggerSideEffects = true) {
-      const container = document.getElementById('chat-container');
-      const div = document.createElement('div');
-      div.className = `message ${role}`;
-      div.dataset.raw = text; // Store raw text for caching
-      div.innerHTML = role === 'ai' || role === 'assistant' ? marked.parse(text) : escapeHtml(text);
-      container.appendChild(div);
-      container.scrollTop = container.scrollHeight;
-
-      if (shouldTriggerSideEffects) {
-        if ((role === 'ai' || role === 'assistant') && isTTSActive && !text.includes('⚠ Error')) {
-          speakText(text);
-        }
-        saveChatToCache();
       }
-    }
 
 
 
-    async function copyHistory() {
-      const msgs = Array.from(document.querySelectorAll('.message'))
-        .filter(m => !m.classList.contains('system-note'))
-        .map(m => (m.classList.contains('user') ? 'JEWELLS: ' : ': ') + m.innerText)
-        .join('\n\n');
-      await navigator.clipboard.writeText(msgs);
-      alert('Memory log synchronized to clipboard.');
-    }
+      async function copyHistory() {
+        const msgs = Array.from(document.querySelectorAll('.message'))
+          .filter(m => !m.classList.contains('system-note'))
+          .map(m => (m.classList.contains('user') ? 'JEWELLS: ' : ': ') + m.innerText)
+          .join('\n\n');
+        await navigator.clipboard.writeText(msgs);
+        alert('Memory log synchronized to clipboard.');
+      }
 
-    // ═══════════════════════════
-    // KEYBOARD
-    // ═══════════════════════════
-    document.getElementById('user-input').addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') handleSend();
-    });
+      // ═══════════════════════════
+      // KEYBOARD
+      // ═══════════════════════════
+      document.getElementById('user-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') handleSend();
+      });
 
-    // ═══════════════════════════
-    // TEXT-TO-SPEECH (TTS) — Clean Web Speech API
-    // ═══════════════════════════
-    let isTTSActive = true;
-    let isSpeaking = false;
-    let selectedVoice = null;
+      // ═══════════════════════════
+      // TEXT-TO-SPEECH (TTS) — Clean Web Speech API
+      // ═══════════════════════════
+      let isTTSActive = true;
+      let isSpeaking = false;
+      let selectedVoice = null;
 
-    // Pre-load voices (Chrome loads them async)
-    function loadVoices() {
-      const voices = window.speechSynthesis.getVoices();
-      if (voices.length === 0) return;
-      // Pick best voice: Zira > Google UK English Female > any Female > en-US fallback
-      selectedVoice =
-        voices.find(v => v.name.includes('Zira')) ||
-        voices.find(v => v.name.includes('Google UK English Female')) ||
-        voices.find(v => v.name.toLowerCase().includes('female') && v.lang.startsWith('en')) ||
-        voices.find(v => v.lang === 'en-US') ||
-        voices[0];
-      console.log('[TTS] Voice selected:', selectedVoice?.name || 'default');
-    }
-    // Chrome fires onvoiceschanged, Firefox/Edge may have them ready immediately
-    if (window.speechSynthesis) {
-      loadVoices();
-      window.speechSynthesis.onvoiceschanged = loadVoices;
-    }
+      // Pre-load voices (Chrome loads them async)
+      function loadVoices() {
+        const voices = window.speechSynthesis.getVoices();
+        if (voices.length === 0) return;
+        // Pick best voice: Zira > Google UK English Female > any Female > en-US fallback
+        selectedVoice =
+          voices.find(v => v.name.includes('Zira')) ||
+          voices.find(v => v.name.includes('Google UK English Female')) ||
+          voices.find(v => v.name.toLowerCase().includes('female') && v.lang.startsWith('en')) ||
+          voices.find(v => v.lang === 'en-US') ||
+          voices[0];
+        console.log('[TTS] Voice selected:', selectedVoice?.name || 'default');
+      }
+      // Chrome fires onvoiceschanged, Firefox/Edge may have them ready immediately
+      if (window.speechSynthesis) {
+        loadVoices();
+        window.speechSynthesis.onvoiceschanged = loadVoices;
+      }
 
-    function toggleTTS() {
-      isTTSActive = !isTTSActive;
-      const btn = document.getElementById('tts-toggle');
-      if (isTTSActive) {
-        btn.textContent = '🔈 ON';
-        btn.style.opacity = '1';
-      } else {
-        btn.textContent = '🔇 OFF';
-        btn.style.opacity = '0.5';
-        window.speechSynthesis.cancel();
+      function toggleTTS() {
+        isTTSActive = !isTTSActive;
+        const btn = document.getElementById('tts-toggle');
+        if (isTTSActive) {
+          btn.textContent = '🔈 ON';
+          btn.style.opacity = '1';
+        } else {
+          btn.textContent = '🔇 OFF';
+          btn.style.opacity = '0.5';
+          window.speechSynthesis.cancel();
+          isSpeaking = false;
+          resumeMicIfNeeded();
+        }
+      }
+
+      function cleanTextForSpeech(text) {
+        let clean = text;
+        clean = clean.replace(/```[\s\S]*?```/g, ' code block ');
+        clean = clean.replace(/`([^`]+)`/g, '$1');
+        clean = clean.replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1');
+        clean = clean.replace(/[\*\_]{1,3}([^\*\_]+)[\*\_]{1,3}/g, '$1');
+        clean = clean.replace(/#{1,6}\s*/g, '');
+        clean = clean.replace(/[->\+\|]/g, '');
+        clean = clean.replace(/\n{2,}/g, '. ');
+        clean = clean.replace(/\s{2,}/g, ' ');
+        return clean.trim();
+      }
+
+      async function speakText(text) {
+        if (!isTTSActive) return;
+
+        // Widget mode: delegate to parent window
+        if (window.parent !== window) {
+          window.parent.postMessage({ type: 'MAGGIE_SPEAK', text }, '*');
+          return;
+        }
+
+        const synth = window.speechSynthesis;
+        if (!synth) return;
+
+        // Pause mic while MAGGIE speaks
+        pauseMicForTTS();
+
+        synth.cancel();
+        isSpeaking = true;
+
+        const clean = cleanTextForSpeech(text);
+        if (!clean) { isSpeaking = false; resumeMicIfNeeded(); return; }
+
+        // Split into sentences for reliable playback (Chrome has a ~15s utterance limit)
+        const chunks = clean.match(/[^.!?]+[.!?]*/g) || [clean];
+
+        for (const chunk of chunks) {
+          if (!isTTSActive || !isSpeaking) break;
+          const trimmed = chunk.trim();
+          if (!trimmed) continue;
+
+          await new Promise((resolve) => {
+            const utterance = new SpeechSynthesisUtterance(trimmed);
+            if (selectedVoice) utterance.voice = selectedVoice;
+            utterance.rate = 1.05;
+            utterance.pitch = 1.05;
+            utterance.onend = resolve;
+            utterance.onerror = () => resolve();
+
+            // Chrome bug workaround: long utterances silently stop
+            // Keep-alive by pausing/resuming every 10s
+            let keepAlive = null;
+            if (trimmed.length > 100) {
+              keepAlive = setInterval(() => {
+                if (synth.speaking && !synth.paused) {
+                  synth.pause();
+                  synth.resume();
+                }
+              }, 10000);
+            }
+            utterance.addEventListener('end', () => clearInterval(keepAlive));
+            utterance.addEventListener('error', () => clearInterval(keepAlive));
+
+            synth.speak(utterance);
+          });
+        }
+
         isSpeaking = false;
         resumeMicIfNeeded();
       }
-    }
 
-    function cleanTextForSpeech(text) {
-      let clean = text;
-      clean = clean.replace(/```[\s\S]*?```/g, ' code block ');
-      clean = clean.replace(/`([^`]+)`/g, '$1');
-      clean = clean.replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1');
-      clean = clean.replace(/[\*\_]{1,3}([^\*\_]+)[\*\_]{1,3}/g, '$1');
-      clean = clean.replace(/#{1,6}\s*/g, '');
-      clean = clean.replace(/[->\+\|]/g, '');
-      clean = clean.replace(/\n{2,}/g, '. ');
-      clean = clean.replace(/\s{2,}/g, ' ');
-      return clean.trim();
-    }
+      // ═══════════════════════════
+      // SPEECH-TO-TEXT (STT) — Mic Input
+      // ═══════════════════════════
+      let recognition = null;
+      let isBrowserListening = false;
 
-    async function speakText(text) {
-      if (!isTTSActive) return;
-
-      // Widget mode: delegate to parent window
-      if (window.parent !== window) {
-        window.parent.postMessage({ type: 'MAGGIE_SPEAK', text }, '*');
-        return;
-      }
-
-      const synth = window.speechSynthesis;
-      if (!synth) return;
-
-      // Pause mic while MAGGIE speaks
-      pauseMicForTTS();
-
-      synth.cancel();
-      isSpeaking = true;
-
-      const clean = cleanTextForSpeech(text);
-      if (!clean) { isSpeaking = false; resumeMicIfNeeded(); return; }
-
-      // Split into sentences for reliable playback (Chrome has a ~15s utterance limit)
-      const chunks = clean.match(/[^.!?]+[.!?]*/g) || [clean];
-
-      for (const chunk of chunks) {
-        if (!isTTSActive || !isSpeaking) break;
-        const trimmed = chunk.trim();
-        if (!trimmed) continue;
-
-        await new Promise((resolve) => {
-          const utterance = new SpeechSynthesisUtterance(trimmed);
-          if (selectedVoice) utterance.voice = selectedVoice;
-          utterance.rate = 1.05;
-          utterance.pitch = 1.05;
-          utterance.onend = resolve;
-          utterance.onerror = () => resolve();
-
-          // Chrome bug workaround: long utterances silently stop
-          // Keep-alive by pausing/resuming every 10s
-          let keepAlive = null;
-          if (trimmed.length > 100) {
-            keepAlive = setInterval(() => {
-              if (synth.speaking && !synth.paused) {
-                synth.pause();
-                synth.resume();
-              }
-            }, 10000);
+      function initSpeech() {
+        const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SR) {
+          const micBtn = document.getElementById('mic-btn');
+          if (micBtn) {
+            micBtn.title = 'Speech not supported — use Chrome or Edge';
+            micBtn.style.opacity = '0.3';
+            micBtn.onclick = () => alert('Speech recognition requires Chrome or Edge.');
           }
-          utterance.addEventListener('end', () => clearInterval(keepAlive));
-          utterance.addEventListener('error', () => clearInterval(keepAlive));
+          console.warn('[STT] SpeechRecognition API not available.');
+          return;
+        }
 
-          synth.speak(utterance);
-        });
+        recognition = new SR();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = 'en-US';
+
+        recognition.onstart = () => {
+          isBrowserListening = true;
+          document.getElementById('mic-btn')?.classList.add('recording');
+          const s = document.getElementById('footer-status');
+          if (s) s.textContent = 'Listening...';
+          console.log('[STT] Mic active.');
+        };
+
+        recognition.onresult = (event) => {
+          let transcript = '';
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            transcript += event.results[i][0].transcript;
+          }
+          const input = document.getElementById('user-input');
+          if (input) input.value = transcript;
+        };
+
+        recognition.onerror = (event) => {
+          console.error('[STT] Error:', event.error);
+          // Only alert on permission denial, not transient errors
+          if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+            alert('Microphone access denied. Please allow mic access in your browser settings.');
+          }
+          // aborted errors are expected during TTS suppression — ignore
+          if (event.error !== 'aborted' && event.error !== 'no-speech') {
+            stopRecording();
+          }
+        };
+
+        recognition.onend = () => {
+          isBrowserListening = false;
+          document.getElementById('mic-btn')?.classList.remove('recording');
+          const s = document.getElementById('footer-status');
+          if (s && !isSpeaking) s.textContent = 'Ready';
+
+          // Auto-restart if user wants to keep listening and we're not in TTS
+          if (isUserWantsToListen && !isSpeechSuppressed && !isSpeaking) {
+            try { recognition.start(); } catch (e) { /* already running or destroyed */ }
+          }
+        };
       }
 
-      isSpeaking = false;
-      resumeMicIfNeeded();
-    }
+      function toggleMic() {
+        if (!recognition) initSpeech();
+        if (!recognition) return;
 
-    // ═══════════════════════════
-    // SPEECH-TO-TEXT (STT) — Mic Input
-    // ═══════════════════════════
-    let recognition = null;
-    let isBrowserListening = false;
-
-    function initSpeech() {
-      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (!SR) {
-        const micBtn = document.getElementById('mic-btn');
-        if (micBtn) {
-          micBtn.title = 'Speech not supported — use Chrome or Edge';
-          micBtn.style.opacity = '0.3';
-          micBtn.onclick = () => alert('Speech recognition requires Chrome or Edge.');
-        }
-        console.warn('[STT] SpeechRecognition API not available.');
-        return;
-      }
-
-      recognition = new SR();
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.lang = 'en-US';
-
-      recognition.onstart = () => {
-        isBrowserListening = true;
-        document.getElementById('mic-btn')?.classList.add('recording');
-        const s = document.getElementById('footer-status');
-        if (s) s.textContent = 'Listening...';
-        console.log('[STT] Mic active.');
-      };
-
-      recognition.onresult = (event) => {
-        let transcript = '';
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          transcript += event.results[i][0].transcript;
-        }
-        const input = document.getElementById('user-input');
-        if (input) input.value = transcript;
-      };
-
-      recognition.onerror = (event) => {
-        console.error('[STT] Error:', event.error);
-        // Only alert on permission denial, not transient errors
-        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-          alert('Microphone access denied. Please allow mic access in your browser settings.');
-        }
-        // aborted errors are expected during TTS suppression — ignore
-        if (event.error !== 'aborted' && event.error !== 'no-speech') {
+        if (isBrowserListening) {
+          // User is turning OFF the mic
+          isUserWantsToListen = false;
+          isSpeechSuppressed = false;
           stopRecording();
+        } else {
+          // User is turning ON the mic
+          isUserWantsToListen = true;
+          isSpeechSuppressed = false;
+          try {
+            recognition.start();
+          } catch (e) {
+            console.error('[STT] Start failed:', e);
+            // If already started, stop and restart
+            try { recognition.stop(); } catch (_) { }
+            setTimeout(() => {
+              try { recognition.start(); } catch (_) { }
+            }, 200);
+          }
         }
-      };
+      }
 
-      recognition.onend = () => {
+      function stopRecording() {
+        if (recognition) {
+          try { recognition.stop(); } catch (e) { }
+        }
         isBrowserListening = false;
         document.getElementById('mic-btn')?.classList.remove('recording');
-        const s = document.getElementById('footer-status');
-        if (s && !isSpeaking) s.textContent = 'Ready';
+      }
 
-        // Auto-restart if user wants to keep listening and we're not in TTS
-        if (isUserWantsToListen && !isSpeechSuppressed && !isSpeaking) {
-          try { recognition.start(); } catch (e) { /* already running or destroyed */ }
+      // --- Mic ↔ TTS coordination ---
+      function pauseMicForTTS() {
+        isSpeechSuppressed = true;
+        if (isBrowserListening && recognition) {
+          try { recognition.abort(); } catch (e) { }
         }
-      };
-    }
+      }
 
-    function toggleMic() {
-      if (!recognition) initSpeech();
-      if (!recognition) return;
-
-      if (isBrowserListening) {
-        // User is turning OFF the mic
-        isUserWantsToListen = false;
+      function resumeMicIfNeeded() {
         isSpeechSuppressed = false;
-        stopRecording();
-      } else {
-        // User is turning ON the mic
-        isUserWantsToListen = true;
-        isSpeechSuppressed = false;
-        try {
-          recognition.start();
-        } catch (e) {
-          console.error('[STT] Start failed:', e);
-          // If already started, stop and restart
-          try { recognition.stop(); } catch (_) { }
+        if (isUserWantsToListen && !isBrowserListening && recognition) {
           setTimeout(() => {
-            try { recognition.start(); } catch (_) { }
-          }, 200);
+            try { recognition.start(); } catch (e) { }
+          }, 300);
         }
       }
-    }
-
-    function stopRecording() {
-      if (recognition) {
-        try { recognition.stop(); } catch (e) { }
-      }
-      isBrowserListening = false;
-      document.getElementById('mic-btn')?.classList.remove('recording');
-    }
-
-    // --- Mic ↔ TTS coordination ---
-    function pauseMicForTTS() {
-      isSpeechSuppressed = true;
-      if (isBrowserListening && recognition) {
-        try { recognition.abort(); } catch (e) { }
-      }
-    }
-
-    function resumeMicIfNeeded() {
-      isSpeechSuppressed = false;
-      if (isUserWantsToListen && !isBrowserListening && recognition) {
-        setTimeout(() => {
-          try { recognition.start(); } catch (e) { }
-        }, 300);
-      }
-    }
 
 
-    // ═══════════════════════════
-    // EMAIL COLLECTION
-    // ═══════════════════════════
-    async function submitEmail() {
-      // Find the active container (either the sidebar or the metrics overlay)
-      const overlay = document.getElementById('metrics-overlay');
-      const container = (overlay && overlay.classList.contains('active')) ? overlay : document.body;
+      // ═══════════════════════════
+      // EMAIL COLLECTION
+      // ═══════════════════════════
+      async function submitEmail() {
+        const nameInput = document.getElementById('collect-name');
+        const emailInput = document.getElementById('collect-email');
+        const status = document.getElementById('collect-status');
 
-      const nameInput = container.querySelector('#collect-name');
-      const emailInput = container.querySelector('#collect-email');
-      const status = container.querySelector('#collect-status');
+        const name = nameInput ? nameInput.value : '';
+        const email = emailInput ? emailInput.value : '';
 
-      const name = nameInput ? nameInput.value : '';
-      const email = emailInput ? emailInput.value : '';
-
-      if (!email || !email.includes('@')) {
-        status.textContent = 'Please provide a valid email.';
-        return;
-      }
-
-      status.textContent = 'Connecting with identity core...';
-
-      try {
-        // 1. Register with MAGGIE's Backend (MySQL)
-        const regRes = await fetch(`${API}/register`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, email })
-        });
-        const regData = await regRes.json();
-
-        if (regData.token) {
-          visitorToken = regData.token;
-          localStorage.setItem('maggie_visitor_token', visitorToken);
-          console.log('[Visitor] Registered and token saved.');
+        if (!email || !email.includes('@')) {
+          status.textContent = 'Please provide a valid email.';
+          return;
         }
 
-        // 2. Sync with Google Sheets (Existing logic)
-        const scriptURL = 'https://script.google.com/macros/s/AKfycbyv9O9f-pX-LID_mH87H33IExSInV_U9V67_K68n3F4m8R8F-Q8R8F-X4m8R8F-Q/exec';
+        status.textContent = 'Connecting with identity core...';
 
-        // Use custom FormData since the form element might be missing
-        const formData = new FormData();
-        formData.append('name', name);
-        formData.append('email', email);
+        try {
+          // 1. Register with MAGGIE's Backend (MySQL)
+          const regRes = await fetch(`${API}/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, email })
+          });
+          const regData = await regRes.json();
 
-        fetch(scriptURL, {
-          method: 'POST',
-          body: formData,
-          mode: 'no-cors'
-        }).catch(e => console.warn('Google Sheets sync failed:', e));
-
-        status.textContent = regData.isReturning ?
-          `Welcome back, ${regData.name}! She remembers you.` :
-          'Registration complete. She knows who you are now.';
-
-        status.style.color = '#00ffcc';
-
-        setTimeout(() => {
-          toggleContact();
-          // Ask MAGGIE to greet the new user if new
-          if (!regData.isReturning) {
-            addMessage(`(A new friend has joined: ${name})`, 'user');
-            handleSend();
+          if (regData.token) {
+            visitorToken = regData.token;
+            localStorage.setItem('maggie_visitor_token', visitorToken);
+            console.log('[Visitor] Registered and token saved.');
           }
-        }, 2000);
 
-      } catch (error) {
-        console.error('Submission failed', error);
-        status.textContent = 'Connection failed. Please try again.';
-        status.style.color = '#ff4b2b';
+          // 2. Sync with Google Sheets (Existing logic)
+          const scriptURL = 'https://script.google.com/macros/s/AKfycbyv9O9f-pX-LID_mH87H33IExSInV_U9V67_K68n3F4m8R8F-Q8R8F-X4m8R8F-Q/exec';
+
+          const formData = new FormData();
+          formData.append('name', name);
+          formData.append('email', email);
+
+          fetch(scriptURL, {
+            method: 'POST',
+            body: formData,
+            mode: 'no-cors'
+          }).catch(e => console.warn('Google Sheets sync failed:', e));
+
+          status.textContent = regData.isReturning ?
+            `Welcome back, ${regData.name}! She remembers you.` :
+            'Registration complete. She knows who you are now.';
+
+          status.style.color = '#00ffcc';
+
+          setTimeout(() => {
+            document.getElementById('keep-in-touch-gate').style.display = 'none';
+            document.getElementById('chat-input-container').style.display = 'flex';
+            checkVisitorIdentity();
+            // Ask MAGGIE to greet the new user if new
+            if (!regData.isReturning) {
+              addMessage(`(A new friend has joined: ${name})`, 'user');
+              handleSend();
+            }
+          }, 2000);
+
+        } catch (error) {
+          console.error('Submission failed', error);
+          status.textContent = 'Connection failed. Please try again.';
+          status.style.color = '#ff4b2b';
+        }
       }
-    }
 
-    async function checkVisitorIdentity() {
-      if (!visitorToken) return;
-      try {
-        const res = await fetch(`${API}/whoami`, {
-          headers: { 'x-visitor-token': visitorToken }
-        });
-        const data = await res.json();
-        if (data.recognized) {
-          console.log(`[Visitor] Recognized as ${data.name}`);
-          currentUser = data;
+      async function checkVisitorIdentity() {
+        if (!visitorToken) return;
+        try {
+          const res = await fetch(`${API}/whoami`, {
+            headers: { 'x-visitor-token': visitorToken }
+          });
+          const data = await res.json();
+          if (data.recognized) {
+            console.log(`[Visitor] Recognized as ${data.name}`);
+            currentUser = data;
 
-          document.getElementById('footer-status').textContent = `System: ${data.name} | ${currentUser.botMode || 'Link Stable'}`;
+            document.getElementById('keep-in-touch-gate').style.display = 'none';
+            document.getElementById('chat-input-container').style.display = 'flex';
 
-          // --- CREATOR PREMIUM RECOGNITION ---
-          if (data.email === 'jewells3271@gmail.com') {
-            // Update the Top Header
-            const bridgeHeader = document.querySelector('.protocol-name');
-            if (bridgeHeader) {
-              bridgeHeader.innerHTML = '<span style="color:var(--neon-gold); text-shadow: 0 0 10px var(--neon-gold)">MAGGIE // PARTNER RECOGNIZED</span>';
+            document.getElementById('footer-status').textContent = `System: ${data.name} | ${currentUser.botMode || 'Link Stable'}`;
+
+            // --- CREATOR PREMIUM RECOGNITION ---
+            if (data.email === 'jewells3271@gmail.com') {
+              // Update the Top Header
+              const bridgeHeader = document.querySelector('.protocol-name');
+              if (bridgeHeader) {
+                bridgeHeader.innerHTML = '<span style="color:var(--neon-gold); text-shadow: 0 0 10px var(--neon-gold)">MAGGIE // PARTNER RECOGNIZED</span>';
+              }
+
+              // High-end glow for the persona
+              const personaImg = document.getElementById('sidebar-img');
+              if (personaImg) {
+                personaImg.style.filter = "saturate(1.2) drop-shadow(0 0 15px rgba(223, 196, 85, 0.4))";
+                personaImg.style.border = "1px solid var(--neon-gold)";
+              }
+
+              console.log('[MAGGIE] Direct neural link established with Architect Jewells.');
             }
-
-            // High-end glow for the persona
-            const personaImg = document.getElementById('sidebar-img');
-            if (personaImg) {
-              personaImg.style.filter = "saturate(1.2) drop-shadow(0 0 15px rgba(223, 196, 85, 0.4))";
-              personaImg.style.border = "1px solid var(--neon-gold)";
-            }
-
-            // Hide the "Keep in Touch" form since the creator is already known
-            const contactWidget = document.querySelector('.email-collect-card')?.closest('.widget');
-            if (contactWidget) {
-              contactWidget.style.display = 'none';
-            }
-
-            console.log('[MAGGIE] Direct neural link established with Architect Jewells.');
+          } else {
+            visitorToken = null;
+            localStorage.removeItem('maggie_visitor_token');
+            document.getElementById('keep-in-touch-gate').style.display = 'block';
+            document.getElementById('chat-input-container').style.display = 'none';
           }
-        } else {
           visitorToken = null;
           localStorage.removeItem('maggie_visitor_token');
         }
@@ -866,61 +874,51 @@
       }
     }
 
-    // ═══════════════════════════
-    // WIDGET METRICS TOGGLE
-    // ═══════════════════════════
-    function toggleMetrics() {
-      const overlay = document.getElementById('metrics-overlay');
-      const isVisible = overlay.classList.toggle('active');
+      // ═══════════════════════════
+      // WIDGET METRICS TOGGLE
+      // ═══════════════════════════
+      function toggleMetrics() {
+        const overlay = document.getElementById('metrics-overlay');
+        const isVisible = overlay.classList.toggle('active');
 
-      if (isVisible) {
-        // Refresh metrics content immediately
-        const metrics = document.querySelector('.sidebar .metric-card').cloneNode(true);
-        const gauge = document.querySelector('.sidebar .context-gauge').cloneNode(true);
+        if (isVisible) {
+          // Refresh metrics content immediately
+          const metrics = document.querySelector('.sidebar .metric-card').cloneNode(true);
+          const gauge = document.querySelector('.sidebar .context-gauge').cloneNode(true);
 
-        // Find the email collect card
-        const emailCard = document.querySelector('.email-collect-card').parentElement.cloneNode(true);
-
-        const content = document.getElementById('metrics-content');
-        content.innerHTML = '';
-        content.appendChild(metrics);
-        content.appendChild(gauge);
-        content.appendChild(emailCard);
-
-        // Re-wire the button in the clone
-        const cloneBtn = content.querySelector('button');
-        if (cloneBtn) {
-          cloneBtn.onclick = submitEmail;
+          const content = document.getElementById('metrics-content');
+          content.innerHTML = '';
+          content.appendChild(metrics);
+          content.appendChild(gauge);
         }
       }
-    }
 
-    // ═══════════════════════════
-    // INIT
-    // ═══════════════════════════
-    async function init() {
-      // First, check if we recognize the user
-      await checkVisitorIdentity();
+      // ═══════════════════════════
+      // INIT
+      // ═══════════════════════════
+      async function init() {
+        // First, check if we recognize the user
+        await checkVisitorIdentity();
 
-      // Update status immediately
-      updateStatus();
+        // Update status immediately
+        updateStatus();
 
-      // Load chat history
-      loadHistory();
+        // Load chat history
+        loadHistory();
 
-      // Initialize speech
-      initSpeech();
+        // Initialize speech
+        initSpeech();
 
-      // Polling for metrics
-      setInterval(updateStatus, 30000); // Poll every 30s
+        // Polling for metrics
+        setInterval(updateStatus, 30000); // Poll every 30s
 
-      // Refresh stats every 5 minutes to stay current
-      setInterval(updateStatus, 300000);
-    }
+        // Refresh stats every 5 minutes to stay current
+        setInterval(updateStatus, 300000);
+      }
 
-    // Start
-    init();
-  </script>
+      // Start
+      init();
+    </script>
 </body>
 
 </html>
