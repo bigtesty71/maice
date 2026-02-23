@@ -174,7 +174,7 @@
 
     const persona = document.createElement('div');
     persona.id = 'MAGGIE-widget-persona';
-    persona.innerHTML = `<img src="${WIDGET_URL}/images/MAGGIE.png" alt="MAGGIE">`;
+    persona.innerHTML = `<img src="https://assets.zyrosite.com/Y22lADx6iVA0O5YU/widget-tPI2NbVGTaB38COe.png" alt="MAGGIE">`;
 
     const frame = document.createElement('iframe');
     frame.id = 'MAGGIE-widget-frame';
