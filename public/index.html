@@ -178,6 +178,7 @@
     let pendingImage = null;
     let isUserWantsToListen = false;
     let isSpeechSuppressed = false;
+    let currentUser = null;
 
     // --- Visitor Recognition ---
     let visitorToken = localStorage.getItem('maggie_visitor_token') || null;
@@ -227,6 +228,15 @@
         // Graph memory
         document.getElementById('graph-nodes-val').textContent = data.graph_nodes || 0;
         document.getElementById('graph-edges-val').textContent = data.graph_edges || 0;
+
+        // Connection Status
+        const statusEl = document.getElementById('footer-status');
+        const modeText = data.bot_mode || 'Stable';
+        if (currentUser && currentUser.recognized) {
+          statusEl.textContent = `System: ${currentUser.name} | ${modeText}`;
+        } else {
+          statusEl.textContent = modeText;
+        }
 
         if (data.graph_top_nodes && data.graph_top_nodes.length > 0) {
           document.getElementById('graph-empty').style.display = 'none';
@@ -752,7 +762,7 @@
           console.log(`[Visitor] Recognized as ${data.name}`);
           currentUser = data;
 
-          document.getElementById('footer-status').textContent = `System: ${data.name}`;
+          document.getElementById('footer-status').textContent = `System: ${data.name} | ${currentUser.botMode || 'Link Stable'}`;
 
           // --- CREATOR PREMIUM RECOGNITION ---
           if (data.email === 'jewells3271@gmail.com') {

@@ -53,10 +53,13 @@ class MemoryKeepEngine {
       user: process.env.MYSQL_USER || 'u649168233_maggie',
       password: process.env.MYSQL_PASSWORD || 'Revolution_100',
       database: process.env.MYSQL_DATABASE || 'u649168233_longterm',
+      ssl: {
+        rejectUnauthorized: false
+      },
       waitForConnections: true,
       connectionLimit: 10,
       queueLimit: 0,
-      connectTimeout: 10000
+      connectTimeout: 15000
     });
     this.dbReady = this.setupStorage(); // Async — tables created on first await
 
@@ -1338,7 +1341,8 @@ class MemoryKeepEngine {
         tasks_pending: dbStats?.taskStats?.pending || 0,
         tasks_done: dbStats?.taskStats?.done || 0,
         tasks_recent: dbStats?.taskStats?.recentTasks || [],
-        status: dbStats ? 'active' : 'degraded'
+        status: dbStats ? 'active' : 'degraded',
+        _v: Date.now()
       };
     } catch (err) {
       console.error('[Status Root Error]', err);
