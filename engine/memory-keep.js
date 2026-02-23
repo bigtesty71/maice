@@ -890,13 +890,18 @@ class MemoryKeepEngine {
 
   /** Get task stats for the status endpoint */
   async getTaskStats() {
-    await this.dbReady;
-    const [[pendingRow]] = await this.pool.execute("SELECT COUNT(*) as count FROM tasks WHERE status = 'pending'");
-    const [[doneRow]] = await this.pool.execute("SELECT COUNT(*) as count FROM tasks WHERE status = 'done'");
-    const [recentTasks] = await this.pool.execute(
-      "SELECT id, description, status, created_at FROM tasks ORDER BY created_at DESC LIMIT 5"
-    );
-    return { pending: pendingRow.count, done: doneRow.count, total: pendingRow.count + doneRow.count, recentTasks };
+    try {
+      await this.dbReady;
+      const [[pendingRow]] = await this.pool.execute("SELECT COUNT(*) as count FROM tasks WHERE status = 'pending'");
+      const [[doneRow]] = await this.pool.execute("SELECT COUNT(*) as count FROM tasks WHERE status = 'done'");
+      const [recentTasks] = await this.pool.execute(
+        "SELECT id, description, status, created_at FROM tasks ORDER BY created_at DESC LIMIT 5"
+      );
+      return { pending: pendingRow.count, done: doneRow.count, total: pendingRow.count + doneRow.count, recentTasks };
+    } catch (err) {
+      console.warn('[getTaskStats] Error:', err.message);
+      return { pending: 0, done: 0, total: 0, recentTasks: [] };
+    }
   }
 
   // =========================================================================
@@ -1008,7 +1013,10 @@ class MemoryKeepEngine {
         };
       })(),
       timeoutPromise
-    ]);
+    ]).catch(err => {
+      console.warn('[getGraphStats] Timeout/Error:', err.message);
+      return { nodeCount: 0, edgeCount: 0, topNodes: [], recentEdges: [] };
+    });
   }
 
   // =========================================================================
