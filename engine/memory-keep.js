@@ -1146,8 +1146,21 @@ class MemoryKeepEngine {
 
     // --- Build Prompt ---
     const toolProtocol = `
-[AGENTIC TOOLS] You have access to the following tools. Use them by writing the tool command on its own line:
-  SEARCH: <query>, REMEMBER: <key>=<value>, TASK_ADD: <desc>, TASK_LIST, TASK_DONE: <id>, ANALYZE, FETCH: <url>, READ: <path>, WRITE: <path>|<content>, LIST_FILES: <dir>, TIME, EMAIL: <to>|<subject>|<body>, BROWSE: <url>, TELEGRAM: <message>.`;
+[AGENTIC TOOLS] You have access to the following tools. MUST use them by writing the tool command on its OWN LINE (never inline mid-sentence):
+  SEARCH: <query>
+  REMEMBER: <key>=<value>
+  TASK_ADD: <desc>
+  TASK_LIST
+  TASK_DONE: <id>
+  ANALYZE
+  FETCH: <url>
+  READ: <path>
+  WRITE: <path> | <content>
+  LIST_FILES: <dir>
+  TIME
+  EMAIL: <to> | <subject> | <body>
+  BROWSE: <url>
+  TELEGRAM: <message>`;
 
     const contextInfo = graphContext ? `\n${graphContext}` : '';
 
@@ -1192,7 +1205,7 @@ class MemoryKeepEngine {
     while (toolRound < 2) {
       const toolCalls = [];
       // Robust block-based tool extractor for active chat
-      const pattern = new RegExp(`^(${TOOL_NAMES.join('|')}):?`, 'gm');
+      const pattern = new RegExp(`\\b(${TOOL_NAMES.join('|')}):?`, 'g');
       const matches = [];
       let m;
       while ((m = pattern.exec(reply)) !== null) {
@@ -1594,15 +1607,15 @@ Respond with tool calls OR a brief internal thought to remember.`
         while (rounds < 2) {
           // Robust block-based tool extractor
           const toolCalls = [];
-          const pattern = new RegExp(`(${TOOL_NAMES.join('|')}):`, 'g');
+          const pattern = new RegExp(`\\b(${TOOL_NAMES.join('|')}):?`, 'g');
           const matches = [];
           let m;
           while ((m = pattern.exec(heartbeatReply)) !== null) {
-            matches.push({ tool: m[1], index: m.index });
+            matches.push({ tool: m[1].toUpperCase(), index: m.index, length: m[0].length });
           }
 
           for (let i = 0; i < matches.length; i++) {
-            const start = matches[i].index + matches[i].tool.length + 1;
+            const start = matches[i].index + matches[i].length;
             const end = (i + 1 < matches.length) ? matches[i + 1].index : heartbeatReply.length;
             const args = heartbeatReply.slice(start, end).trim();
             toolCalls.push({ tool: matches[i].tool, args });
