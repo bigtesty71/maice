@@ -112,7 +112,7 @@ class MemoryKeepEngine {
       await this.pool.execute(`
         CREATE TABLE IF NOT EXISTS experience_memory (
           id INT AUTO_INCREMENT PRIMARY KEY,
-          content TEXT,
+          content LONGTEXT,
           timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
       `);
@@ -1063,10 +1063,19 @@ class MemoryKeepEngine {
         throw new Error('No valid JSON found in sifter output.');
       }
     } catch (err) {
-      console.error('[Sifter Error]', err.message, '— Flushing stream.');
-      // Emergency flush: keep last 5 messages
-      this.stream = this.stream.slice(-5);
+      console.error('[MAGGIE] Sifter Error:', err.message);
+
+      // FIX: Never discard memory. If the sifter fails, save the raw snapshot to DB.
+      console.log('[MAGGIE] Consolidation failed. Saving raw snapshot to Experience Memory as fallback.');
+      await this.saveExperience(`[RAW CONSOLIDATION FALLBACK] The Sleep Simulation sifter failed. Raw snapshot of conversation preserved:\n\n${snapshot}`);
+
+      // Flush some of the stream to prevent context overflow, but keep more than 5.
+      // 15 turns is enough to maintain the immediate "conscious" thread.
+      const preserveCount = 15;
+      this.stream = this.stream.slice(-preserveCount);
       this._saveStream();
+
+      console.log(`[MAGGIE] Emergency flush complete. ${preserveCount} turns kept, full history archived to DB.`);
     }
   }
 
@@ -1280,7 +1289,7 @@ class MemoryKeepEngine {
       // Intake valve on the description
       this.intakeValve(`[Vision] User shared an image. AI described: ${reply.slice(0, 200)}`).catch(() => { });
 
-      console.log('[ Vision] Response generated.');
+      console.log('[Vision] Response generated.');
       return reply;
     } catch (err) {
       console.error('[Vision Error]', err.message);
@@ -1347,6 +1356,31 @@ class MemoryKeepEngine {
     } catch (err) {
       console.error('[Status Root Error]', err);
       return { status: 'error', error: err.message };
+    }
+  }
+
+  /**
+   * Sync/Restore the volatile chat stream from a client-side cache.
+   * This ensures continuity even if the server restarts.
+   */
+  async restoreStream(history = []) {
+    if (!Array.isArray(history) || history.length === 0) return;
+
+    // Filter to ensure basic schema
+    const cleanHistory = history.filter(m => m.role && m.content).map(m => ({
+      role: m.role === 'assistant' || m.role === 'ai' ? 'assistant' : 'user', // normalize
+      content: m.content
+    }));
+
+    if (cleanHistory.length === 0) return;
+
+    // If local stream is empty or very short, restore from client
+    if (this.stream.length <= 1) {
+      console.log(`[MAGGIE] Restoring stream from client cache (${cleanHistory.length} turns).`);
+      this.stream = cleanHistory;
+      this._saveStream();
+    } else {
+      console.log('[MAGGIE] Server already has active stream. Skipping client sync.');
     }
   }
 

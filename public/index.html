@@ -313,7 +313,7 @@
 
       // Show user message
       const displayText = pendingImage ? `📷 ${text || 'What do you see?'}` : text;
-      addMessage(displayText, 'user');
+      renderMessage(displayText, 'user');
 
       // Show image preview in chat if attached
       if (pendingImage) {
@@ -354,7 +354,7 @@
         }
 
         removeElement(thinkingId);
-        addMessage(data.reply || data.error || 'No signal.', 'ai');
+        renderMessage(data.reply || data.error || 'No signal.', 'ai');
         updateStatus();
       } catch (err) {
         removeElement(thinkingId);
@@ -387,6 +387,9 @@
       if (role === 'ai' && isTTSActive && !text.includes('⚠ Error')) {
         speakText(text);
       }
+
+      // --- NEW: Client-Side Persistence ---
+      saveChatToCache();
     }
 
     function addTyping(id) {
@@ -414,6 +417,34 @@
     // HISTORY & ACTIONS
     // ═══════════════════════════
     async function loadHistory() {
+      // 1. Try to load from local cache first for instant continuity
+      const cacheKey = visitorToken ? `maggie_cache_${visitorToken}` : 'maggie_cache_anonymous';
+      const cached = localStorage.getItem(cacheKey);
+      let localHistory = [];
+      if (cached) {
+        try {
+          localHistory = JSON.parse(cached);
+          if (localHistory.length > 0) {
+            const container = document.getElementById('chat-container');
+            container.innerHTML = '';
+            localHistory.forEach(m => {
+              if (m.role !== 'system') {
+                renderMessage(m.content, m.role === 'user' ? 'user' : 'ai', false);
+              }
+            });
+            console.log('[Cache] Restored from local persistence.');
+
+            // --- NEW: Sync local history back to server ---
+            fetch(`${API}/sync`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ history: localHistory })
+            }).catch(e => console.warn('[Sync] Failed to warm up server stream.'));
+          }
+        } catch (e) { console.warn('[Cache] Corruption detected.'); }
+      }
+
+      // 2. Then sync with server for truth
       try {
         const res = await fetch(`${API}/history`);
         const data = await res.json();
@@ -422,11 +453,44 @@
           container.innerHTML = '';
           data.history.forEach(m => {
             if (m.role !== 'system') {
-              addMessage(m.content, m.role === 'user' ? 'user' : 'ai');
+              renderMessage(m.content, m.role === 'user' ? 'user' : 'ai', false);
             }
           });
+          // Update cache with server truth
+          saveChatToCache();
         }
       } catch { /* first load */ }
+    }
+
+    function saveChatToCache() {
+      const msgs = Array.from(document.querySelectorAll('.message'))
+        .filter(m => !m.classList.contains('system-note') && !m.id?.startsWith('ai-thinking'))
+        .map(m => ({
+          role: m.classList.contains('user') ? 'user' : 'assistant',
+          content: m.dataset.raw || m.innerText
+        }))
+        .slice(-50); // Keep last 50 for performance
+
+      const cacheKey = visitorToken ? `maggie_cache_${visitorToken}` : 'maggie_cache_anonymous';
+      localStorage.setItem(cacheKey, JSON.stringify(msgs));
+    }
+
+    // Refactored message renderer to support "silent" (no TTS/Cache trigger) re-renders
+    function renderMessage(text, role, shouldTriggerSideEffects = true) {
+      const container = document.getElementById('chat-container');
+      const div = document.createElement('div');
+      div.className = `message ${role}`;
+      div.dataset.raw = text; // Store raw text for caching
+      div.innerHTML = role === 'ai' || role === 'assistant' ? marked.parse(text) : escapeHtml(text);
+      container.appendChild(div);
+      container.scrollTop = container.scrollHeight;
+
+      if (shouldTriggerSideEffects) {
+        if ((role === 'ai' || role === 'assistant') && isTTSActive && !text.includes('⚠ Error')) {
+          speakText(text);
+        }
+        saveChatToCache();
+      }
     }
 
 
