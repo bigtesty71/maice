@@ -1543,6 +1543,9 @@ class MemoryKeepEngine {
   BROWSE: <url> — Browse a full web page
   EMAIL: <to> | <subject> | <body> — Send email from @companain.life
   TELEGRAM: <message> — Message the user on Telegram
+  WRITE: <path> | <content> — Write content to a file
+  READ: <path> — Read content from a file
+  LIST_FILES: <path> — List files in a directory
 
 You have access to your full knowledge graph and memory. Use this time wisely:
 - Explore topics from your graph that interest you
@@ -1562,7 +1565,7 @@ Respond with tool calls OR a brief internal thought to remember.`
         let heartbeatReply = await this.callLLM(heartbeatPrompt, 'heartbeat');
 
         // Process tool calls from heartbeat (up to 2 rounds)
-        const TOOL_NAMES = ['SEARCH', 'REMEMBER', 'TASK_ADD', 'ANALYZE', 'BROWSE', 'EMAIL', 'TELEGRAM'];
+        const TOOL_NAMES = ['SEARCH', 'REMEMBER', 'TASK_ADD', 'ANALYZE', 'BROWSE', 'EMAIL', 'TELEGRAM', 'WRITE', 'READ', 'LIST_FILES'];
         let rounds = 0;
         while (rounds < 2) {
           const toolCalls = [];
