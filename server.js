@@ -157,6 +157,42 @@ app.get('/whoami', async (req, res) => {
 });
 
 /**
+ * GET /api/reports — List all autonomous reports
+ */
+app.get('/api/reports', async (req, res) => {
+    try {
+        const fs = require('fs').promises;
+        const reportsDir = path.join(__dirname, 'public', 'reports');
+
+        // Ensure directory exists
+        try {
+            await fs.access(reportsDir);
+        } catch {
+            await fs.mkdir(reportsDir, { recursive: true });
+        }
+
+        const files = await fs.readdir(reportsDir);
+        const htmlFiles = files.filter(f => f.endsWith('.html') && f !== 'index.html');
+
+        const reports = await Promise.all(htmlFiles.map(async f => {
+            const stats = await fs.stat(path.join(reportsDir, f));
+            return {
+                name: f,
+                displayName: f.replace(/_/g, ' ').replace('.html', '').replace(/\b\w/g, l => l.toUpperCase()),
+                url: `/reports/${f}`,
+                created: stats.birthtime,
+                size: stats.size
+            };
+        }));
+
+        res.json({ reports });
+    } catch (err) {
+        console.error('[Reports List Error]', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
  * POST /api/telegram — Telegram Webhook Receiver
  */
 app.post('/api/telegram', async (req, res) => {
