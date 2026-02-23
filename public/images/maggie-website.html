@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAGGIE | Persistent Cognitive Agent</title>
+
+    <!-- Favicon (Fixes the 404 error) -->
+    <link rel="icon" type="image/png" href="https://assets.zyrosite.com/Y22lADx6iVA0O5YU/logo-0WDrEaih69a3rf4u.png">
+
+    <!-- Tailwind CSS Engine -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Lucide Icons Library -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Custom Font for MAGGIE -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@900&display=swap" rel="stylesheet">
+
+    <!-- Enables smooth gliding when navigation links are clicked -->
+    <style>
+        html {
+            scroll-behavior: smooth;
+        }
+    </style>
+</head>
+
+<body
+    class="min-h-screen bg-[#1a1118] text-gray-200 font-sans selection:bg-[#0097b2] selection:text-white overflow-x-hidden">
+
+    <!-- Navigation -->
+    <nav class="fixed w-full z-50 bg-[#291b25]/90 backdrop-blur-md border-b border-white/10">
+        <div class="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
+            <div class="flex items-center">
+                <!-- Restored the original maggie-logo to the header -->
+                <img src="https://assets.zyrosite.com/Y22lADx6iVA0O5YU/maggie-logo-FlQMeIcuFReLpPAA.png"
+                    alt="MAGGIE Header Logo"
+                    class="h-16 md:h-20 w-auto object-contain drop-shadow-[0_0_15px_rgba(0,151,178,0.4)] bg-transparent border-none"
+                    style="background-color: transparent !important;" />
+            </div>
+            <!-- Fixed links to use JS scrolling to prevent iframe navigation bugs -->
+            <div class="hidden md:flex gap-8 text-sm font-bold tracking-widest drop-shadow-md">
+                <button type="button"
+                    onclick="document.getElementById('capabilities').scrollIntoView({ behavior: 'smooth' })"
+                    class="text-gray-100 hover:text-[#0097b2] transition-colors bg-transparent border-none cursor-pointer uppercase">CAPABILITIES</button>
+                <button type="button"
+                    onclick="document.getElementById('exploration').scrollIntoView({ behavior: 'smooth' })"
+                    class="text-gray-100 hover:text-[#eb6e20] transition-colors bg-transparent border-none cursor-pointer uppercase">AUTONOMY</button>
+                <button type="button"
+                    onclick="document.getElementById('memorykeep').scrollIntoView({ behavior: 'smooth' })"
+                    class="text-gray-100 hover:text-[#0097b2] transition-colors bg-transparent border-none cursor-pointer uppercase">MEMORYKEEP
+                    CORE</button>
+                <button type="button"
+                    onclick="document.getElementById('investors').scrollIntoView({ behavior: 'smooth' })"
+                    class="text-gray-100 hover:text-[#eb6e20] transition-colors bg-transparent border-none cursor-pointer uppercase">INVESTORS</button>
+            </div>
+            <!-- Scroll Logic to force iframe parent scrolling -->
+            <button
+                onclick="document.getElementById('page-footer').scrollIntoView({ behavior: 'smooth', block: 'end' }); setTimeout(() => document.getElementById('MAGGIE-widget-launcher')?.click(), 800);"
+                class="bg-[#eb6e20] hover:bg-[#d95c15] text-white px-6 py-2 rounded-full font-bold transition-all transform hover:scale-105 shadow-[0_0_15px_rgba(235,110,32,0.4)]">
+                Initialize System
+            </button>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="pt-32 pb-20 px-6 relative overflow-hidden">
+        <!-- Abstract background glow -->
+        <div class="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-[#0097b2] rounded-full blur-[120px] opacity-20">
+        </div>
+        <div
+            class="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-[#eb6e20] rounded-full blur-[120px] opacity-20">
+        </div>
+
+        <div class="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 items-center relative z-10">
+            <div class="flex flex-col gap-6">
+                <div
+                    class="inline-block px-4 py-1.5 rounded-full border border-[#0097b2]/50 bg-[#0097b2]/10 text-[#0097b2] font-semibold text-sm w-max mb-4">
+                    v1.0 Online & Active
+                </div>
+                <h1 class="text-5xl md:text-7xl font-black leading-tight text-white">
+                    Meet <span
+                        class="text-transparent bg-clip-text bg-gradient-to-r from-[#eb6e20] to-[#0097b2]">MAGGIE.</span>
+                </h1>
+                <p class="text-xl md:text-2xl text-gray-300 font-light leading-relaxed">
+                    Your Persistent Cognitive Agent. Powered by advanced graph-native memory to provide unbroken,
+                    context-aware assistance across your entire digital ecosystem.
+                </p>
+
+                <div class="flex flex-col sm:flex-row gap-4 mt-6">
+                    <!-- Scroll Logic to force iframe parent scrolling -->
+                    <button
+                        onclick="document.getElementById('page-footer').scrollIntoView({ behavior: 'smooth', block: 'end' }); setTimeout(() => document.getElementById('MAGGIE-widget-launcher')?.click(), 800);"
+                        class="flex items-center justify-center gap-2 bg-[#0097b2] hover:bg-[#00829a] text-white px-8 py-4 rounded-lg font-bold text-lg transition-all shadow-[0_0_20px_rgba(0,151,178,0.3)]">
+                        <i data-lucide="network" class="w-6 h-6"></i>
+                        Connect to Bridge
+                    </button>
+                    <div class="flex items-center gap-4 text-sm text-gray-400 px-4">
+                        <span class="flex h-3 w-3 relative">
+                            <span
+                                class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#eb6e20] opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-3 w-3 bg-[#eb6e20]"></span>
+                        </span>
+                        Widget Active: Try the sparkle below
+                    </div>
+                </div>
+            </div>
+
+            <div class="relative group">
+                <div
+                    class="absolute -inset-1 bg-gradient-to-r from-[#eb6e20] to-[#0097b2] rounded-xl blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200">
+                </div>
+                <div class="relative bg-[#291b25] border border-white/10 rounded-xl overflow-hidden shadow-2xl">
+                    <!-- Top Bar for Video -->
+                    <div class="bg-black/50 px-4 py-2 border-b border-white/10 flex items-center gap-2">
+                        <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                        <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                        <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                        <span class="ml-2 text-xs font-mono text-gray-400">visual_feed.mp4</span>
+                    </div>
+                    <!-- Video Embed -->
+                    <div class="relative w-full pt-[75%] bg-black">
+                        <iframe src="https://drive.google.com/file/d/1trTlL62Uba6t0rpsV3Pe_a_NaA60fK28/preview"
+                            class="absolute top-0 left-0 w-full h-full" allow="autoplay"
+                            title="MAGGIE Video Demo"></iframe>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Persona Capabilities Section -->
+    <section id="capabilities" class="py-24 bg-[#21161d] relative border-t border-white/5 scroll-mt-24">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="text-center mb-20">
+                <h2 class="text-4xl md:text-5xl font-bold text-white mb-6">Multi-Faceted Operative</h2>
+                <p class="text-xl text-gray-400 max-w-3xl mx-auto">
+                    MAGGIE isn't just a chat box. She assumes specialized roles to manage your communications, gather
+                    intelligence, and oversee system operations autonomously.
+                </p>
+            </div>
+
+            <div class="flex flex-col gap-24">
+
+                <!-- Feature 1: Comms -->
+                <div class="grid md:grid-cols-2 gap-12 items-center">
+                    <div class="order-2 md:order-1 relative">
+                        <div class="absolute -inset-4 bg-[#eb6e20]/20 rounded-2xl blur-xl"></div>
+                        <div
+                            class="relative rounded-xl border border-[#eb6e20]/30 shadow-2xl z-10 w-full overflow-hidden aspect-video md:aspect-square lg:aspect-video bg-black">
+                            <img src="https://assets.zyrosite.com/Y22lADx6iVA0O5YU/comms-0mI3aqZRxwslSIyn.png"
+                                alt="Comms interface" class="absolute top-0 left-0 w-full h-full object-cover" />
+                        </div>
+                    </div>
+                    <div class="order-1 md:order-2">
+                        <div class="flex items-center gap-3 text-[#eb6e20] mb-4">
+                            <i data-lucide="mail" class="w-7 h-7"></i>
+                            <h3 class="text-2xl font-bold uppercase tracking-wide">Omnichannel Comms</h3>
+                        </div>
+                        <h4 class="text-4xl font-black text-white mb-6">Always Connected. Always Responsive.</h4>
+                        <p class="text-lg text-gray-300 leading-relaxed mb-6">
+                            MAGGIE seamlessly integrates into your workflow. She acts as your dedicated communications
+                            officer, managing email drafts, monitoring Telegram channels in real-time, and providing
+                            instant on-screen feedback.
+                        </p>
+                        <ul class="space-y-4 text-gray-300">
+                            <li class="flex items-start gap-3"><i data-lucide="chevron-right"
+                                    class="text-[#eb6e20] shrink-0"></i> <span>Direct Telegram API integration for
+                                    automated channel moderation.</span></li>
+                            <li class="flex items-start gap-3"><i data-lucide="chevron-right"
+                                    class="text-[#eb6e20] shrink-0"></i> <span>Context-aware email drafting utilizing
+                                    past conversational memory.</span></li>
+                            <li class="flex items-start gap-3"><i data-lucide="chevron-right"
+                                    class="text-[#eb6e20] shrink-0"></i> <span>Real-time on-screen widget
+                                    assistance.</span></li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Feature 2: Exploration -->
+                <div id="exploration" class="grid md:grid-cols-2 gap-12 items-center scroll-mt-24">
+                    <div>
+                        <div class="flex items-center gap-3 text-[#0097b2] mb-4">
+                            <i data-lucide="globe" class="w-7 h-7"></i>
+                            <h3 class="text-2xl font-bold uppercase tracking-wide">Autonomous Discovery</h3>
+                        </div>
+                        <h4 class="text-4xl font-black text-white mb-6">Charting the Unknown Web.</h4>
+                        <p class="text-lg text-gray-300 leading-relaxed mb-6">
+                            MAGGIE does not wait for instructions. Utilizing her exploration protocols, she ventures out
+                            autonomously to browse the internet, gather vital research, and bring back actionable
+                            intelligence tailored to your preferences.
+                        </p>
+                        <ul class="space-y-4 text-gray-300">
+                            <li class="flex items-start gap-3"><i data-lucide="chevron-right"
+                                    class="text-[#0097b2] shrink-0"></i> <span>Autonomous scraping and data
+                                    summarization.</span></li>
+                            <li class="flex items-start gap-3"><i data-lucide="chevron-right"
+                                    class="text-[#0097b2] shrink-0"></i> <span>Continuous monitoring of assigned topics
+                                    and keywords.</span></li>
+                            <li class="flex items-start gap-3"><i data-lucide="chevron-right"
+                                    class="text-[#0097b2] shrink-0"></i> <span>Pre-compiles briefings before you even
+                                    ask.</span></li>
+                        </ul>
+                    </div>
+                    <div class="relative">
+                        <div class="absolute -inset-4 bg-[#0097b2]/20 rounded-2xl blur-xl"></div>
+                        <div
+                            class="relative rounded-xl border border-[#0097b2]/30 shadow-2xl z-10 w-full overflow-hidden aspect-video md:aspect-square lg:aspect-video bg-black">
+                            <img src="https://assets.zyrosite.com/Y22lADx6iVA0O5YU/exploration-KSRnwnxlNWnVG3AD.png"
+                                alt="Exploration vessel" class="absolute top-0 left-0 w-full h-full object-cover" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Feature 3: Bridge/Core -->
+                <div class="grid md:grid-cols-2 gap-12 items-center">
+                    <div class="order-2 md:order-1 relative">
+                        <div class="absolute -inset-4 bg-purple-500/20 rounded-2xl blur-xl"></div>
+                        <div
+                            class="relative rounded-xl border border-purple-500/30 shadow-2xl z-10 w-full overflow-hidden aspect-video md:aspect-square lg:aspect-video bg-black">
+                            <img src="https://assets.zyrosite.com/Y22lADx6iVA0O5YU/bridge-1RvvYLkz0HZa1xN2.png"
+                                alt="Command Bridge" class="absolute top-0 left-0 w-full h-full object-cover" />
+                        </div>
+                    </div>
+                    <div class="order-1 md:order-2">
+                        <div class="flex items-center gap-3 text-purple-400 mb-4">
+                            <i data-lucide="cpu" class="w-7 h-7"></i>
+                            <h3 class="text-2xl font-bold uppercase tracking-wide">Strategic Command</h3>
+                        </div>
+                        <h4 class="text-4xl font-black text-white mb-6">The Central Intelligence.</h4>
+                        <p class="text-lg text-gray-300 leading-relaxed mb-6">
+                            From the bridge, MAGGIE acts as your central command hub. She delegates sub-tasks, monitors
+                            active streams, and synthesizes patterns from massive amounts of data to provide high-level
+                            strategic advice.
+                        </p>
+                        <div class="grid grid-cols-2 gap-4 mt-8">
+                            <div class="bg-[#291b25] p-4 rounded-lg border border-white/5">
+                                <h5 class="font-bold text-white mb-1">Task Delegation</h5>
+                                <p class="text-sm text-gray-400">Routes requests to specialized sub-routines.</p>
+                            </div>
+                            <div class="bg-[#291b25] p-4 rounded-lg border border-white/5">
+                                <h5 class="font-bold text-white mb-1">System Health</h5>
+                                <p class="text-sm text-gray-400">Monitors API usage and token governance.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Feature 4: Widget Integration -->
+                <div class="grid md:grid-cols-2 gap-12 items-center">
+                    <div>
+                        <div class="flex items-center gap-3 text-[#0097b2] mb-4">
+                            <i data-lucide="sparkles" class="w-7 h-7"></i>
+                            <h3 class="text-2xl font-bold uppercase tracking-wide">Seamless Integration</h3>
+                        </div>
+                        <h4 class="text-4xl font-black text-white mb-6">Omnipresent Widget.</h4>
+                        <p class="text-lg text-gray-300 leading-relaxed mb-6">
+                            Deploy MAGGIE to any web environment instantly. The interactive persistent widget ensures
+                            her cognitive reasoning and toolsets are always just one click away, integrating beautifully
+                            into your existing ecosystem.
+                        </p>
+                        <ul class="space-y-4 text-gray-300">
+                            <li class="flex items-start gap-3"><i data-lucide="chevron-right"
+                                    class="text-[#0097b2] shrink-0"></i> <span>Single-line JavaScript injection for
+                                    immediate deployment.</span></li>
+                            <li class="flex items-start gap-3"><i data-lucide="chevron-right"
+                                    class="text-[#0097b2] shrink-0"></i> <span>Voice-enabled interactions with seamless
+                                    TTS integration.</span></li>
+                            <li class="flex items-start gap-3"><i data-lucide="chevron-right"
+                                    class="text-[#0097b2] shrink-0"></i> <span>Persistent memory syncs context across
+                                    all widget instances.</span></li>
+                        </ul>
+                    </div>
+                    <div class="relative">
+                        <div class="absolute -inset-4 bg-[#0097b2]/20 rounded-2xl blur-xl"></div>
+                        <div
+                            class="relative rounded-xl border border-[#0097b2]/30 shadow-2xl z-10 w-full overflow-hidden aspect-video md:aspect-square lg:aspect-video bg-black">
+                            <img src="https://assets.zyrosite.com/Y22lADx6iVA0O5YU/logo-0WDrEaih69a3rf4u.png"
+                                alt="Widget integration" class="absolute top-0 left-0 w-full h-full object-cover" />
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- MemoryKeep Architecture Section -->
+    <section id="memorykeep" class="py-24 relative overflow-hidden scroll-mt-24">
+        <div
+            class="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-[#0097b2] to-transparent opacity-50">
+        </div>
+
+        <div class="max-w-7xl mx-auto px-6 relative z-10">
+            <div class="flex flex-col md:flex-row gap-12 items-center mb-16">
+                <div class="md:w-1/3">
+                    <div
+                        class="w-full max-w-[300px] mx-auto rounded-full border-4 border-[#291b25] shadow-[0_0_40px_rgba(0,151,178,0.3)] overflow-hidden aspect-square relative bg-black">
+                        <img src="https://assets.zyrosite.com/Y22lADx6iVA0O5YU/4-kjq1xoaKKVWDz4p1.png"
+                            alt="MAGGIE Profile" class="absolute top-0 left-0 w-full h-full object-cover" />
+                    </div>
+                </div>
+                <div class="md:w-2/3">
+                    <div
+                        class="inline-block px-4 py-1.5 rounded bg-white/5 border border-white/10 text-gray-300 font-mono text-sm mb-4">
+                        Architecture Spec: v1.0 (2026)
+                    </div>
+                    <h2 class="text-4xl md:text-5xl font-black text-white mb-6">
+                        Powered by <span class="text-[#0097b2]">MemoryKeep</span>
+                    </h2>
+                    <p class="text-xl text-gray-400 leading-relaxed">
+                        Standard LLMs forget. MAGGIE remembers. Utilizing a Graph-Native Cognitive Memory Architecture,
+                        MAGGIE transforms from a stateless responder into a persistent cognitive system.
+                    </p>
+                </div>
+            </div>
+
+            <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <!-- Arch Card 1 -->
+                <div
+                    class="bg-[#21161d] p-8 rounded-xl border border-white/5 hover:border-[#0097b2]/50 transition-colors group">
+                    <i data-lucide="brain"
+                        class="text-[#0097b2] w-12 h-12 mb-6 group-hover:scale-110 transition-transform"></i>
+                    <h3 class="text-xl font-bold text-white mb-3">Graph-Native Topology</h3>
+                    <p class="text-gray-400 text-sm leading-relaxed">
+                        Memory is structural, not textual. Relationships, entities, and events are stored as a typed,
+                        provenance-aware property graph rather than unstructured document chunks.
+                    </p>
+                </div>
+
+                <!-- Arch Card 2 -->
+                <div
+                    class="bg-[#21161d] p-8 rounded-xl border border-white/5 hover:border-[#eb6e20]/50 transition-colors group">
+                    <i data-lucide="shield-check"
+                        class="text-[#eb6e20] w-12 h-12 mb-6 group-hover:scale-110 transition-transform"></i>
+                    <h3 class="text-xl font-bold text-white mb-3">Token Governance</h3>
+                    <p class="text-gray-400 text-sm leading-relaxed">
+                        Strict context boundaries (C + S + R ≤ A ≤ M). Bounded active streams and confident-filtered
+                        snippet injections prevent token bloat and control inference costs.
+                    </p>
+                </div>
+
+                <!-- Arch Card 3 -->
+                <div
+                    class="bg-[#21161d] p-8 rounded-xl border border-white/5 hover:border-purple-500/50 transition-colors group">
+                    <i data-lucide="network"
+                        class="text-purple-400 w-12 h-12 mb-6 group-hover:scale-110 transition-transform"></i>
+                    <h3 class="text-xl font-bold text-white mb-3">Hybrid Retrieval</h3>
+                    <p class="text-gray-400 text-sm leading-relaxed">
+                        Combines semantic similarity with k-hop graph traversal and path-based ranking. Only
+                        high-confidence, structurally relevant memory snippets are recalled.
+                    </p>
+                </div>
+
+                <!-- Arch Card 4 -->
+                <div
+                    class="bg-[#21161d] p-8 rounded-xl border border-white/5 hover:border-[#0097b2]/50 transition-colors group">
+                    <i data-lucide="clock"
+                        class="text-[#0097b2] w-12 h-12 mb-6 group-hover:scale-110 transition-transform"></i>
+                    <h3 class="text-xl font-bold text-white mb-3">Temporal Awareness</h3>
+                    <p class="text-gray-400 text-sm leading-relaxed">
+                        All nodes and edges support historical versioning. MAGGIE understands state-at-time queries,
+                        preference drift, and allows for deterministic reboot recovery.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Investor Relations Section -->
+    <section id="investors"
+        class="py-20 bg-gradient-to-b from-[#21161d] to-[#110b0f] border-t border-white/5 relative overflow-hidden scroll-mt-24">
+        <div
+            class="absolute top-[20%] left-[50%] translate-x-[-50%] w-[50%] h-[50%] bg-[#eb6e20] rounded-full blur-[150px] opacity-10 pointer-events-none">
+        </div>
+
+        <div class="max-w-4xl mx-auto px-6 text-center relative z-10">
+            <div
+                class="inline-flex items-center justify-center p-4 bg-[#eb6e20]/10 rounded-full mb-6 border border-[#eb6e20]/30 shadow-[0_0_20px_rgba(235,110,32,0.2)]">
+                <i data-lucide="trending-up" class="w-8 h-8 text-[#eb6e20]"></i>
+            </div>
+
+            <h2 class="text-4xl md:text-5xl font-black text-white mb-6">Partner with the Future of AI</h2>
+
+            <p class="text-xl text-gray-400 mb-10 leading-relaxed max-w-2xl mx-auto">
+                We are actively seeking visionary partners and investors to scale the MemoryKeep architecture and deploy
+                persistent cognitive agents into the enterprise sector.
+            </p>
+
+            <div class="flex flex-col sm:flex-row justify-center gap-5">
+                <!-- Replace 'your-email@example.com' with your actual email -->
+                <a href="mailto:investors@memorykeep.cloud"
+                    class="flex items-center justify-center gap-2 bg-transparent border-2 border-[#0097b2] hover:bg-[#0097b2] text-white px-8 py-4 rounded-full font-bold transition-all shadow-[0_0_15px_rgba(0,151,178,0.2)] hover:shadow-[0_0_25px_rgba(0,151,178,0.5)] text-lg">
+                    <i data-lucide="mail" class="w-5 h-5"></i>
+                    Contact Investor Relations
+                </a>
+
+                <!-- This links out to your public-facing PDF whitepaper -->
+                <a href="https://assets.zyrosite.com/Y22lADx6iVA0O5YU/memorykeep-vpdL3LKwkjkpCtrX.pdf" target="_blank"
+                    class="flex items-center justify-center gap-2 bg-[#291b25] hover:bg-[#3a2835] border border-white/10 text-white px-8 py-4 rounded-full font-bold transition-all text-lg shadow-lg hover:shadow-xl">
+                    <i data-lucide="file-text" class="w-5 h-5"></i>
+                    Read Whitepaper
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer - Added ID to act as the scroll target -->
+    <footer id="page-footer" class="bg-[#110b0f] pt-16 pb-8 border-t border-white/5 relative">
+        <div class="max-w-7xl mx-auto px-6 grid md:grid-cols-4 gap-12 mb-12">
+            <div class="col-span-2">
+                <div class="flex items-center mb-6">
+                    <img src="https://assets.zyrosite.com/Y22lADx6iVA0O5YU/logo-0WDrEaih69a3rf4u.png"
+                        alt="MAGGIE Footer Logo"
+                        class="h-16 md:h-24 w-auto object-contain drop-shadow-[0_0_15px_rgba(0,151,178,0.4)] bg-transparent border-none"
+                        style="background-color: transparent !important;" />
+                </div>
+                <p class="text-gray-400 max-w-sm">
+                    The graph-native cognitive architecture for persistent, long-running AI deployments.
+                </p>
+            </div>
+            <div>
+                <h4 class="text-white font-bold mb-4 uppercase tracking-wider text-sm">System</h4>
+                <ul class="space-y-2 text-gray-400 text-sm">
+                    <li><a href="#" class="hover:text-[#0097b2] transition-colors">Core Cognitive State</a></li>
+                    <li><a href="#" class="hover:text-[#0097b2] transition-colors">Intake Engine</a></li>
+                    <li><a href="#" class="hover:text-[#0097b2] transition-colors">Hybrid Retrieval</a></li>
+                </ul>
+            </div>
+            <div>
+                <h4 class="text-white font-bold mb-4 uppercase tracking-wider text-sm">Operations</h4>
+                <ul class="space-y-2 text-gray-400 text-sm">
+                    <li><a href="#" class="hover:text-[#eb6e20] transition-colors">Communications</a></li>
+                    <li><a href="#" class="hover:text-[#eb6e20] transition-colors">Exploration</a></li>
+                    <li><a href="#" class="hover:text-[#eb6e20] transition-colors">Command Bridge</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="max-w-7xl mx-auto px-6 text-center text-gray-600 text-sm flex flex-col items-center gap-4">
+            <p>© 2026 MAGGIE Systems. Powered by MemoryKeep™ Architecture.</p>
+        </div>
+    </footer>
+
+    <!-- Initialize Icons -->
+    <script>
+        lucide.createIcons();
+    </script>
+
+    <!-- Inject MAGGIE Widget -->
+    <script src="https://maice-eosin.vercel.app/widget.js" async></script>
+</body>
+
+</html>
