@@ -258,7 +258,7 @@ class MemoryKeepEngine {
       month: 'long', day: 'numeric', year: 'numeric'
     });
 
-    return `\n[ACTIVE VISITOR] You are currently speaking with ${visitor.name}. ` +
+    return `\n[ACTIVE VISITOR] You are currently speaking with ${visitor.name} (${visitor.email}). ` +
       `They first connected on ${firstDate}. ` +
       `Address them by name naturally — you remember them.`;
   }
