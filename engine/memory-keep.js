@@ -1183,22 +1183,19 @@ class MemoryKeepEngine {
 
     while (toolRound < 2) {
       const toolCalls = [];
-      const lines = reply.split('\n');
+      // Robust block-based tool extractor for active chat
+      const pattern = new RegExp(`^(${TOOL_NAMES.join('|')}):?`, 'gm');
+      const matches = [];
+      let m;
+      while ((m = pattern.exec(reply)) !== null) {
+        matches.push({ tool: m[1].toUpperCase(), index: m.index, length: m[0].length });
+      }
 
-      for (const line of lines) {
-        const trimmed = line.trim();
-        for (const tool of TOOL_NAMES) {
-          const prefix = tool + ':';
-          if (trimmed.toUpperCase().startsWith(prefix)) {
-            const args = trimmed.slice(prefix.length).trim();
-            toolCalls.push({ tool, args });
-            break;
-          }
-          if (trimmed.toUpperCase() === tool) {
-            toolCalls.push({ tool, args: '' });
-            break;
-          }
-        }
+      for (let i = 0; i < matches.length; i++) {
+        const start = matches[i].index + matches[i].length;
+        const end = (i + 1 < matches.length) ? matches[i + 1].index : reply.length;
+        const args = reply.slice(start, end).trim();
+        toolCalls.push({ tool: matches[i].tool, args });
       }
 
       if (toolCalls.length === 0) break;
