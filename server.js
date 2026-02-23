@@ -86,6 +86,24 @@ app.get('/status', async (req, res) => {
 });
 
 /**
+ * POST /sync — Synchronize client-side history to the server
+ */
+app.post('/sync', async (req, res) => {
+    try {
+        const { history } = req.body;
+        if (!history || !Array.isArray(history)) {
+            return res.status(400).json({ error: 'History array is required.' });
+        }
+        await engine.restoreStream(history);
+        console.log(`[Sync] Restored ${history.length} messages from client cache.`);
+        res.json({ ok: true });
+    } catch (err) {
+        console.error('[Sync Error]', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/**
  * GET /history — Current stream state
  */
 app.get('/history', (req, res) => {
