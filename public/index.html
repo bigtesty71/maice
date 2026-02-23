@@ -197,37 +197,40 @@
         const res = await fetch(`${API}/status`);
         const data = await res.json();
 
-        document.getElementById('exp-val').textContent = data.experience_count || 0;
-        document.getElementById('dom-val').textContent = data.domain_count || 0;
+        document.querySelectorAll('#exp-val').forEach(el => el.textContent = data.experience_count || 0);
+        document.querySelectorAll('#dom-val').forEach(el => el.textContent = data.domain_count || 0);
 
         // Context gauge
         const pct = data.context_cap
           ? Math.round((data.stream_tokens / data.context_cap) * 100)
           : 0;
-        document.getElementById('ctx-pct').textContent = pct + '%';
-        const fill = document.getElementById('ctx-fill');
-        fill.style.width = pct + '%';
-        fill.className = 'gauge-fill' + (pct > 70 ? ' warning' : '');
+        document.querySelectorAll('#ctx-pct').forEach(el => el.textContent = pct + '%');
+        document.querySelectorAll('#ctx-fill').forEach(fill => {
+          fill.style.width = pct + '%';
+          fill.className = 'gauge-fill' + (pct > 70 ? ' warning' : '');
+        });
 
         // Sifter reports
         if (data.sifter_patterns && data.sifter_patterns.length > 0) {
-          document.getElementById('reports').innerHTML = data.sifter_patterns
+          const html = data.sifter_patterns
             .map(p => `<div class="report-item">${escapeHtml(p.content)}</div>`)
             .join('');
+          document.querySelectorAll('#reports').forEach(el => el.innerHTML = html);
         }
 
         // Intake feed
         if (data.recent_experiences && data.recent_experiences.length > 0) {
-          document.getElementById('activity').innerHTML = data.recent_experiences
+          const html = data.recent_experiences
             .map(e => {
               const ts = e.timestamp ? e.timestamp.split(' ')[1] || '' : '';
               return `<div class="activity-line"><span class="ts">${ts}</span> ${escapeHtml(e.content)}</div>`;
             }).join('');
+          document.querySelectorAll('#activity').forEach(el => el.innerHTML = html);
         }
 
         // Graph memory
-        document.getElementById('graph-nodes-val').textContent = data.graph_nodes || 0;
-        document.getElementById('graph-edges-val').textContent = data.graph_edges || 0;
+        document.querySelectorAll('#graph-nodes-val').forEach(el => el.textContent = data.graph_nodes || 0);
+        document.querySelectorAll('#graph-edges-val').forEach(el => el.textContent = data.graph_edges || 0);
 
         // Connection Status
         const statusEl = document.getElementById('footer-status');
@@ -239,29 +242,31 @@
         }
 
         if (data.graph_top_nodes && data.graph_top_nodes.length > 0) {
-          document.getElementById('graph-empty').style.display = 'none';
-          document.getElementById('graph-nodes-display').innerHTML = data.graph_top_nodes
+          document.querySelectorAll('#graph-empty').forEach(el => el.style.display = 'none');
+          const html = data.graph_top_nodes
             .map(n => `<span class="graph-node-tag">${escapeHtml(n.label)} <span class="strength">${n.strength}</span></span>`)
             .join('');
+          document.querySelectorAll('#graph-nodes-display').forEach(el => el.innerHTML = html);
         } else {
-          document.getElementById('graph-empty').style.display = 'block';
-          document.getElementById('graph-nodes-display').innerHTML = '';
+          document.querySelectorAll('#graph-empty').forEach(el => el.style.display = 'block');
+          document.querySelectorAll('#graph-nodes-display').forEach(el => el.innerHTML = '');
         }
 
         if (data.graph_recent_edges && data.graph_recent_edges.length > 0) {
-          document.getElementById('graph-edges-display').innerHTML = data.graph_recent_edges
+          const html = data.graph_recent_edges
             .map(e => `<div class="graph-edge">${escapeHtml(e.source_label)} <span class="rel">—[${escapeHtml(e.relationship)}]→</span> ${escapeHtml(e.target_label)}</div>`)
             .join('');
+          document.querySelectorAll('#graph-edges-display').forEach(el => el.innerHTML = html);
         } else {
-          document.getElementById('graph-edges-display').innerHTML = '';
+          document.querySelectorAll('#graph-edges-display').forEach(el => el.innerHTML = '');
         }
         // Task tracker
         if (data.tasks_pending !== undefined) {
-          document.getElementById('task-stats').innerHTML =
-            `Pending: <span>${data.tasks_pending}</span> · Done: <span>${data.tasks_done}</span>`;
+          const html = `Pending: <span>${data.tasks_pending}</span> · Done: <span>${data.tasks_done}</span>`;
+          document.querySelectorAll('#task-stats').forEach(el => el.innerHTML = html);
         }
         if (data.tasks_recent && data.tasks_recent.length > 0) {
-          document.getElementById('task-list').innerHTML = data.tasks_recent
+          const html = data.tasks_recent
             .map(t => {
               const isDone = t.status === 'done';
               return `<div class="task-item${isDone ? ' done' : ''}">
@@ -269,6 +274,7 @@
                 ${escapeHtml(t.description)}
               </div>`;
             }).join('');
+          document.querySelectorAll('#task-list').forEach(el => el.innerHTML = html);
         }
       } catch {
         document.querySelector('.header-label').innerHTML =
