@@ -750,10 +750,34 @@
         const data = await res.json();
         if (data.recognized) {
           console.log(`[Visitor] Recognized as ${data.name}`);
-          // Optional: Add a subtle hint in UI that she knows you
-          document.getElementById('footer-status').textContent = `Recognized: ${data.name}`;
+          currentUser = data;
+
+          document.getElementById('footer-status').textContent = `System: ${data.name}`;
+
+          // --- CREATOR PREMIUM RECOGNITION ---
+          if (data.email === 'jewells3271@gmail.com') {
+            // Update the Top Header
+            const bridgeHeader = document.querySelector('.protocol-name');
+            if (bridgeHeader) {
+              bridgeHeader.innerHTML = '<span style="color:var(--neon-gold); text-shadow: 0 0 10px var(--neon-gold)">MAGGIE // PARTNER RECOGNIZED</span>';
+            }
+
+            // High-end glow for the persona
+            const personaImg = document.getElementById('sidebar-img');
+            if (personaImg) {
+              personaImg.style.filter = "saturate(1.2) drop-shadow(0 0 15px rgba(223, 196, 85, 0.4))";
+              personaImg.style.border = "1px solid var(--neon-gold)";
+            }
+
+            // Hide the "Keep in Touch" form since the creator is already known
+            const contactWidget = document.querySelector('.email-collect-card')?.closest('.widget');
+            if (contactWidget) {
+              contactWidget.style.display = 'none';
+            }
+
+            console.log('[MAGGIE] Direct neural link established with Architect Jewells.');
+          }
         } else {
-          // Token invalid or burned? Clean up.
           visitorToken = null;
           localStorage.removeItem('maggie_visitor_token');
         }
