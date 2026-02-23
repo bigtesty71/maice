@@ -1290,52 +1290,60 @@ class MemoryKeepEngine {
   // =========================================================================
 
   async getStatus() {
-    await this.dbReady;
+    try {
+      // Helper for timeouts
+      const timeout = (ms) => new Promise((_, reject) => setTimeout(() => reject(new Error('DB Timeout')), ms));
 
-    const [[expRow]] = await this.pool.execute('SELECT COUNT(*) as count FROM experience_memory');
-    const [[domRow]] = await this.pool.execute('SELECT COUNT(*) as count FROM domain_memory');
+      const dbStats = await Promise.race([
+        (async () => {
+          await this.dbReady;
+          const [[expRow]] = await this.pool.execute('SELECT COUNT(*) as count FROM experience_memory');
+          const [[domRow]] = await this.pool.execute('SELECT COUNT(*) as count FROM domain_memory');
+          const [recentRows] = await this.pool.execute("SELECT content, timestamp FROM experience_memory WHERE content NOT LIKE '[Sifter Pattern]%' ORDER BY timestamp DESC LIMIT 5");
+          const [patternRows] = await this.pool.execute("SELECT content FROM experience_memory WHERE content LIKE '[Sifter Pattern]%' ORDER BY timestamp DESC LIMIT 3");
+          const graph = await this.getGraphStats();
+          const taskStats = await this.getTaskStats();
 
-    const [recentRows] = await this.pool.execute(
-      "SELECT content, timestamp FROM experience_memory WHERE content NOT LIKE '[Sifter Pattern]%' ORDER BY timestamp DESC LIMIT 5"
-    );
+          return {
+            experience_count: expRow.count,
+            domain_count: domRow.count,
+            recent: recentRows.map(row => ({
+              content: row.content.length > 70 ? row.content.slice(0, 70) + '..' : row.content,
+              timestamp: row.timestamp
+            })),
+            patterns: patternRows.map(r => ({ content: r.content.replace('[Sifter Pattern] ', '') })),
+            graph,
+            taskStats
+          };
+        })(),
+        timeout(12000)
+      ]).catch(err => {
+        console.error('[MAGGIE Status Error]', err.message);
+        return null;
+      });
 
-    const recent = recentRows.map(row => ({
-      content: row.content.length > 70 ? row.content.slice(0, 70) + '..' : row.content,
-      timestamp: row.timestamp
-    }));
-
-    const [patternRows] = await this.pool.execute(
-      "SELECT content FROM experience_memory WHERE content LIKE '[Sifter Pattern]%' ORDER BY timestamp DESC LIMIT 3"
-    );
-
-    const patterns = patternRows.map(r => ({
-      content: r.content.replace('[Sifter Pattern] ', '')
-    }));
-
-    // --- Graph Stats ---
-    const graph = await this.getGraphStats();
-
-    // --- Task Stats ---
-    const taskStats = await this.getTaskStats();
-
-    return {
-      experience_count: expRow.count,
-      domain_count: domRow.count,
-      recent_experiences: recent,
-      sifter_patterns: patterns,
-      stream_messages: this.stream.length,
-      stream_tokens: this._getStreamTokens(),
-      context_cap: this.config.app_context_cap,
-      bot_mode: 'Neural-Keep (Graph + MySQL)',
-      graph_nodes: graph.nodeCount,
-      graph_edges: graph.edgeCount,
-      graph_top_nodes: graph.topNodes,
-      graph_recent_edges: graph.recentEdges,
-      tasks_pending: taskStats.pending,
-      tasks_done: taskStats.done,
-      tasks_recent: taskStats.recentTasks,
-      status: 'active'
-    };
+      return {
+        experience_count: dbStats?.experience_count || 0,
+        domain_count: dbStats?.domain_count || 0,
+        recent_experiences: dbStats?.recent || [],
+        sifter_patterns: dbStats?.patterns || [],
+        stream_messages: this.stream.length,
+        stream_tokens: this._getStreamTokens(),
+        context_cap: this.config.app_context_cap,
+        bot_mode: dbStats ? 'Neural-Keep (Graph + MySQL)' : 'Local-Mode (DB Offline)',
+        graph_nodes: dbStats?.graph?.nodeCount || 0,
+        graph_edges: dbStats?.graph?.edgeCount || 0,
+        graph_top_nodes: dbStats?.graph?.topNodes || [],
+        graph_recent_edges: dbStats?.graph?.recentEdges || [],
+        tasks_pending: dbStats?.taskStats?.pending || 0,
+        tasks_done: dbStats?.taskStats?.done || 0,
+        tasks_recent: dbStats?.taskStats?.recentTasks || [],
+        status: dbStats ? 'active' : 'degraded'
+      };
+    } catch (err) {
+      console.error('[Status Root Error]', err);
+      return { status: 'error', error: err.message };
+    }
   }
 
   // =========================================================================
@@ -1544,6 +1552,9 @@ Respond with tool calls OR a brief internal thought to remember.`
         // If the heartbeat produced a thought worth remembering
         if (heartbeatReply && !heartbeatReply.includes('SEARCH:') && !heartbeatReply.includes('BROWSE:')) {
           console.log(`[Heartbeat Thought] ${heartbeatReply.slice(0, 100)}`);
+          // Save the summary of her findings to Experience Memory so Jewells can see it on the web UI
+          const persistenceMsg = `[Autonomous Insight] ${heartbeatReply.trim().slice(0, 500)}`;
+          await this.saveExperience(persistenceMsg);
         }
 
         console.log('--- [ Heartbeat] Cycle complete ---\n');

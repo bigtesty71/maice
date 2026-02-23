@@ -113,7 +113,7 @@
           <input type="text" id="collect-name" placeholder="Name">
           <input type="email" id="collect-email" placeholder="Email" required>
           <button onclick="submitEmail()" class="action-btn" style="width:100%; margin-top:10px;">Connect</button>
-          <div id="collect-status" style="font-size: 0.7rem; margin-top: 8px; text-align: center; display: none;"></div>
+          <div id="collect-status" style="font-size: 0.7rem; margin-top: 8px; text-align: center;"></div>
         </div>
       </div>
     </div>
@@ -685,11 +685,10 @@
 
       if (!email || !email.includes('@')) {
         status.textContent = 'Please provide a valid email.';
-        statusElement.textContent = 'Please enter a valid email.';
         return;
       }
 
-      statusElement.textContent = 'Connecting with identity core...';
+      status.textContent = 'Connecting with identity core...';
 
       try {
         // 1. Register with MAGGIE's Backend (MySQL)
@@ -708,17 +707,23 @@
 
         // 2. Sync with Google Sheets (Existing logic)
         const scriptURL = 'https://script.google.com/macros/s/AKfycbyv9O9f-pX-LID_mH87H33IExSInV_U9V67_K68n3F4m8R8F-Q8R8F-X4m8R8F-Q/exec';
-        await fetch(scriptURL, {
-          method: 'POST',
-          body: new FormData(document.getElementById('contact-form')),
-          mode: 'no-cors'
-        });
 
-        statusElement.textContent = regData.isReturning ?
+        // Use custom FormData since the form element might be missing
+        const formData = new FormData();
+        formData.append('name', name);
+        formData.append('email', email);
+
+        fetch(scriptURL, {
+          method: 'POST',
+          body: formData,
+          mode: 'no-cors'
+        }).catch(e => console.warn('Google Sheets sync failed:', e));
+
+        status.textContent = regData.isReturning ?
           `Welcome back, ${regData.name}! She remembers you.` :
           'Registration complete. She knows who you are now.';
 
-        statusElement.style.color = '#00ffcc';
+        status.style.color = '#00ffcc';
 
         setTimeout(() => {
           toggleContact();
@@ -731,8 +736,8 @@
 
       } catch (error) {
         console.error('Submission failed', error);
-        statusElement.textContent = 'Connection failed. Please try again.';
-        statusElement.style.color = '#ff4b2b';
+        status.textContent = 'Connection failed. Please try again.';
+        status.style.color = '#ff4b2b';
       }
     }
 
