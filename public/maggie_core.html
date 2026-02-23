@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAGGIE | MemoryKeep Neural Core</title>
+    <style>
+        :root {
+            --bg: #0d0d12;
+            --surface: rgba(26, 26, 36, 0.8);
+            --accent: #0097b2;
+            --accent-glow: rgba(0, 151, 178, 0.4);
+            --text: #f6f6e9;
+            --text-dim: rgba(246, 246, 233, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --neon-green: #b5e48c;
+            --neon-gold: #dfc455;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg);
+            background-image:
+                radial-gradient(circle at 20% 20%, rgba(0, 151, 178, 0.15) 0%, transparent 40%),
+                radial-gradient(circle at 80% 80%, rgba(223, 196, 85, 0.05) 0%, transparent 40%);
+            color: var(--text);
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        .container {
+            position: relative;
+            background: var(--surface);
+            backdrop-filter: blur(20px);
+            padding: 60px 40px;
+            border-radius: 24px;
+            border: 1px solid var(--glass-border);
+            text-align: center;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            max-width: 500px;
+            width: 90%;
+            z-index: 10;
+        }
+
+        .status-header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+
+        .pulse {
+            width: 10px;
+            height: 10px;
+            background: var(--neon-green);
+            border-radius: 50%;
+            box-shadow: 0 0 15px var(--neon-green);
+            animation: pulse-glow 2s infinite;
+        }
+
+        @keyframes pulse-glow {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+                box-shadow: 0 0 10px var(--neon-green);
+            }
+
+            50% {
+                transform: scale(1.4);
+                opacity: 0.6;
+                box-shadow: 0 0 20px var(--neon-green);
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 1;
+                box-shadow: 0 0 10px var(--neon-green);
+            }
+        }
+
+        .status-text {
+            font-size: 0.75rem;
+            letter-spacing: 3px;
+            font-weight: 600;
+            color: var(--neon-green);
+            text-transform: uppercase;
+        }
+
+        h1 {
+            font-size: 3.5rem;
+            font-weight: 300;
+            letter-spacing: 8px;
+            margin-bottom: 10px;
+            color: var(--text);
+            text-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+        }
+
+        .sub-title {
+            font-size: 0.9rem;
+            color: var(--accent);
+            font-family: monospace;
+            letter-spacing: 2px;
+            margin-bottom: 40px;
+            text-transform: uppercase;
+        }
+
+        .info-box {
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--glass-border);
+            padding: 20px;
+            border-radius: 12px;
+            line-height: 1.8;
+            font-size: 0.95rem;
+            color: var(--text-dim);
+            text-align: left;
+        }
+
+        .info-box strong {
+            color: var(--text);
+            font-weight: 500;
+        }
+
+        .footer-tag {
+            margin-top: 40px;
+            display: inline-block;
+            background: linear-gradient(90deg, rgba(0, 151, 178, 0.2), transparent);
+            border: 1px solid var(--accent);
+            padding: 6px 16px;
+            border-radius: 6px;
+            font-size: 0.7rem;
+            letter-spacing: 1px;
+            color: var(--accent);
+            text-transform: uppercase;
+        }
+
+        /* Decorative elements */
+        .bg-glow {
+            position: absolute;
+            width: 300px;
+            height: 300px;
+            background: var(--accent-glow);
+            filter: blur(100px);
+            border-radius: 50%;
+            z-index: 1;
+            pointer-events: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="bg-glow"></div>
+    <div class="container">
+        <div class="status-header">
+            <div class="pulse"></div>
+            <span class="status-text">Neural Core Online</span>
+        </div>
+
+        <h1>MAGGIE</h1>
+        <div class="sub-title">MemoryKeep v3.2.0</div>
+
+        <div class="info-box">
+            Primary Identity: <strong>MAGGIE</strong><br>
+            Neural Protocol: <strong>Autonomous Liaison</strong><br>
+            Memory Status: <strong>Persistent (MySQL Wired)</strong><br>
+            Connectivity: <strong>Secured via Neural Bridge</strong>
+        </div>
+
+        <div class="footer-tag">Hostinger Neural Hub Interface</div>
+    </div>
+</body>
+
+</html>
